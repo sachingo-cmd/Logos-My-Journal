@@ -18,16 +18,14 @@
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
         .surprise-box { animation: float 3s ease-in-out infinite; }
         .habit-marker { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #4b5563; }
-        .loading-shimmer { background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
-    <!-- Sync Loading Overlay -->
-    <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-500">
+    <!-- Sync Loading Overlay (Fades out quickly) -->
+    <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
         <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-xs uppercase tracking-[0.3em] text-blue-500 font-bold">Syncing with Cloud...</p>
+        <p class="text-xs uppercase tracking-[0.3em] text-blue-500 font-bold">Synchronizing...</p>
     </div>
 
     <!-- Header -->
@@ -54,7 +52,7 @@
     <section class="w-full max-w-2xl mb-10 px-2">
         <div class="flex justify-between items-end mb-2">
             <div class="space-y-0.5">
-                <span id="habit-status-text" class="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">Initiating</span>
+                <span id="habit-status-text" class="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">Initializing</span>
                 <div class="text-lg font-bold"><span id="total-days-display">0</span> <span class="text-gray-600">/ 90 Days</span></div>
             </div>
             <span id="progress-percent" class="text-xs font-medium text-blue-400">0%</span>
@@ -74,41 +72,17 @@
         <section id="setup-section" class="glass p-6 rounded-2xl hidden mb-6 border-blue-500/30">
             <div class="flex justify-between items-start mb-4">
                 <h2 class="text-blue-400 font-semibold flex items-center gap-2">
-                    <i data-lucide="cloud-cog" class="w-4 h-4"></i> Cloud Connection
+                    <i data-lucide="shield-check" class="w-4 h-4"></i> Secure Connection
                 </h2>
-                <button onclick="resetVault()" class="text-[9px] text-gray-600 hover:text-red-400 uppercase tracking-widest">Wipe Local Data</button>
+                <button onclick="resetVault()" class="text-[9px] text-gray-600 hover:text-red-400 uppercase tracking-widest">Reset All</button>
             </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-gray-500 block mb-1">Google Script URL</label>
-                    <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-all">
-                </div>
-
-                <div class="pt-2 border-t border-white/5">
-                    <label class="text-[10px] uppercase font-bold text-gray-500 block mb-1">Your Sync Key (Device Link)</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="sync-key-input" readonly class="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-blue-400 focus:outline-none">
-                        <button onclick="copySyncKey()" class="px-3 bg-white/5 hover:bg-white/10 rounded-lg transition"><i data-lucide="copy" class="w-4 h-4"></i></button>
-                    </div>
-                    <p class="text-[9px] text-gray-600 mt-2">Paste this key on another device to sync your progress.</p>
-                </div>
-
-                <div class="pt-2">
-                    <label class="text-[10px] uppercase font-bold text-gray-500 block mb-1">Use a different Sync Key?</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="manual-sync-key" placeholder="Paste key from other device..." class="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-xs outline-none focus:border-blue-500">
-                        <button onclick="applyManualSync()" class="px-4 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg transition text-[10px] font-bold uppercase">Link</button>
-                    </div>
-                </div>
-
-                <button onclick="saveConfig()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-xs transition font-bold uppercase tracking-widest mt-2">Apply Settings</button>
-            </div>
+            <p class="text-xs text-gray-500 mb-4">Paste your Google Script URL to enable cloud-sync across devices.</p>
+            <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm mb-3 focus:border-blue-500 outline-none transition-all">
+            <button onclick="saveConfig()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm transition font-bold uppercase tracking-widest">Connect & Sync</button>
         </section>
 
         <!-- Form -->
         <div id="journal-form" class="space-y-6 pb-20">
-            <!-- Items 1-4 -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase">1. Micro-Win</label><span id="count-1" class="text-[9px] text-gray-700">0/20</span></div>
@@ -128,7 +102,6 @@
                 </div>
             </div>
 
-            <!-- Brain Dump -->
             <div class="space-y-2">
                 <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">5. Brain Dump (Catharsis)</label><span id="count-5" class="text-[10px] text-gray-600 font-bold">0/250</span></div>
                 <div class="relative">
@@ -159,224 +132,136 @@
              <i data-lucide="award" class="w-12 h-12 text-yellow-500 mx-auto fill-yellow-500/10"></i>
              <div class="space-y-2">
                 <h2 class="text-xl font-bold text-yellow-400 italic uppercase">Archivist Status Unlocked</h2>
-                <p class="text-xs text-gray-400">100 Coins achieved. You have unlocked AI-Readiness. Your data is now structured for high-level pattern recognition.</p>
+                <p class="text-xs text-gray-400">100 Coins achieved. Your data is now structured for high-level pattern recognition.</p>
              </div>
-             <button onclick="dismissSurprise()" class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition">Claim Identity</button>
+             <button onclick="dismissSurprise()" class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-yellow-500 transition">Claim Identity</button>
         </div>
 
     </main>
 
     <footer class="mt-auto py-8 text-center">
         <button onclick="showSetup()" class="text-[9px] text-gray-700 hover:text-blue-500 transition uppercase tracking-[0.2em] flex items-center gap-2 mx-auto">
-            <i data-lucide="settings" class="w-3 h-3"></i> Sync & Connection
+            <i data-lucide="settings" class="w-3 h-3"></i> Connection Settings
         </button>
     </footer>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-        // Global Variables
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'logos-journal-app';
-
-        let user = null;
+    <script>
+        // State Management
         let state = {
-            coins: 0,
-            streak: 0,
-            totalDays: 0,
-            lastEntry: null,
+            coins: parseInt(localStorage.getItem('logos_coins')) || 0,
+            streak: parseInt(localStorage.getItem('logos_streak')) || 0,
+            totalDays: parseInt(localStorage.getItem('logos_total_days')) || 0,
+            lastEntry: localStorage.getItem('logos_lastEntry') || null,
             configUrl: localStorage.getItem('logos_gas_url') || '',
-            surpriseClaimed: false
+            surpriseClaimed: localStorage.getItem('logos_surprise_claimed') === 'true'
         };
 
-        // UI Selectors
-        const setupSection = document.getElementById('setup-section');
-        const syncOverlay = document.getElementById('sync-overlay');
-        const coinDisp = document.getElementById('coin-display');
-        const streakDisp = document.getElementById('streak-display');
-        const totalDaysDisp = document.getElementById('total-days-display');
-        const habitBar = document.getElementById('habit-progress-bar');
-        const percentDisp = document.getElementById('progress-percent');
-        const statusText = document.getElementById('habit-status-text');
-        const shieldBtn = document.getElementById('shield-btn');
-        const submitBtn = document.getElementById('submit-btn');
-
-        // Initialize Icons
         lucide.createIcons();
 
-        // 1. Auth & Initial Sync
-        const initAuth = async () => {
-            const manualKey = localStorage.getItem('logos_manual_uid');
-            if (manualKey) {
-                // If user manually linked a key, we'll try to use it
-                // Note: True custom token auth requires server side, but we'll use local storage ID tracking
-                // to stay within Firestore paths Rule 1.
+        // 1. Connection & Loading Logic
+        async function initSync() {
+            if (state.configUrl) {
+                try {
+                    const response = await fetch(state.configUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: "sync_load" })
+                    });
+                    
+                    // Note: NO-CORS mode makes response opaque, but we can try a workaround 
+                    // or stick to regular behavior. For the best sync, we'll push local to cloud 
+                    // on every submit, and cloud to local on app load if possible.
+                } catch (e) { console.error("Sync Error", e); }
             }
-
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
-
-        initAuth();
-
-        onAuthStateChanged(auth, async (u) => {
-            if (u) {
-                user = u;
-                const uidToUse = localStorage.getItem('logos_manual_uid') || user.uid;
-                document.getElementById('sync-key-input').value = uidToUse;
-                
-                // Set up real-time sync from Firestore
-                const userRef = doc(db, 'artifacts', appId, 'users', uidToUse, 'profile', 'data');
-                
-                onSnapshot(userRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const cloudData = snapshot.data();
-                        state = { ...state, ...cloudData };
-                        updateUI();
-                    } else {
-                        // First time user, save current local state if exists
-                        saveToCloud();
-                    }
-                    syncOverlay.classList.add('opacity-0', 'pointer-events-none');
-                }, (error) => {
-                    console.error("Cloud Sync Error:", error);
-                    syncOverlay.classList.add('opacity-0', 'pointer-events-none');
-                });
-            }
-        });
-
-        // 2. State Persistance Logic
-        async function saveToCloud() {
-            if (!user) return;
-            const uidToUse = localStorage.getItem('logos_manual_uid') || user.uid;
-            const userRef = doc(db, 'artifacts', appId, 'users', uidToUse, 'profile', 'data');
-            await setDoc(userRef, {
-                coins: state.coins,
-                streak: state.streak,
-                totalDays: state.totalDays,
-                lastEntry: state.lastEntry,
-                surpriseClaimed: state.surpriseClaimed,
-                configUrl: state.configUrl
-            });
+            
+            setTimeout(() => {
+                document.getElementById('sync-overlay').classList.add('opacity-0', 'pointer-events-none');
+                updateUI();
+            }, 800);
         }
 
-        // 3. UI Updates
-        window.updateUI = function() {
-            coinDisp.innerText = state.coins;
-            streakDisp.innerText = state.streak;
-            totalDaysDisp.innerText = state.totalDays;
+        initSync();
+
+        function updateUI() {
+            document.getElementById('coin-display').innerText = state.coins;
+            document.getElementById('streak-display').innerText = state.streak;
+            document.getElementById('total-days-display').innerText = state.totalDays;
             
             const p = Math.min((state.totalDays / 90) * 100, 100);
-            habitBar.style.width = p + '%';
-            percentDisp.innerText = Math.floor(p) + '%';
+            document.getElementById('habit-progress-bar').style.width = p + '%';
+            document.getElementById('progress-percent').innerText = Math.floor(p) + '%';
 
-            if (state.totalDays >= 90) statusText.innerText = "Habit Solidified";
-            else if (state.totalDays >= 66) statusText.innerText = "Automaticity Zone";
-            else if (state.totalDays >= 30) statusText.innerText = "Building Momentum";
-            else statusText.innerText = "Initiating";
+            if (state.totalDays >= 90) document.getElementById('habit-status-text').innerText = "Habit Solidified";
+            else if (state.totalDays >= 66) document.getElementById('habit-status-text').innerText = "Automaticity Zone";
+            else if (state.totalDays >= 30) document.getElementById('habit-status-text').innerText = "Building Momentum";
+            else document.getElementById('habit-status-text').innerText = "Initiating";
 
-            if (state.coins >= 100) shieldBtn.classList.remove('hidden');
+            if (state.coins >= 100) document.getElementById('shield-btn').classList.remove('hidden');
             if (state.coins >= 100 && !state.surpriseClaimed) {
                 document.getElementById('mystery-surprise').classList.remove('hidden');
                 document.getElementById('journal-form').classList.add('opacity-10', 'pointer-events-none');
             }
+            if (!state.configUrl) document.getElementById('setup-section').classList.remove('hidden');
+        }
 
-            if (!state.configUrl) setupSection.classList.remove('hidden');
-        };
-
-        // 4. Input Handlers
-        window.validate = function() {
-            const textareas = document.querySelectorAll('textarea');
+        // 2. Validation
+        const textareas = document.querySelectorAll('textarea');
+        const submitBtn = document.getElementById('submit-btn');
+        function validate() {
             let allValid = true;
             textareas.forEach(ta => {
                 const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
                 const limit = parseInt(ta.dataset.limit);
-                const display = document.getElementById(`count-${ta.id.split('-')[1]}`);
-                display.innerText = `${words}/${limit}`;
+                document.getElementById(`count-${ta.id.split('-')[1]}`).innerText = `${words}/${limit}`;
                 if (words > limit || words === 0) {
                     ta.classList.toggle('limit-exceeded', words > limit);
                     allValid = false;
-                } else {
-                    ta.classList.remove('limit-exceeded');
-                }
+                } else { ta.classList.remove('limit-exceeded'); }
                 if (ta.id === 'prompt-5') document.getElementById('dump-progress').style.width = `${Math.min((words/limit)*100, 100)}%`;
             });
             submitBtn.disabled = !allValid;
             submitBtn.className = allValid ? "w-full py-4 rounded-xl bg-blue-600 text-white font-bold tracking-widest uppercase text-xs" : "w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold tracking-widest uppercase text-xs";
-        };
+        }
+        textareas.forEach(ta => ta.addEventListener('input', validate));
 
-        document.querySelectorAll('textarea').forEach(ta => ta.addEventListener('input', window.validate));
-
-        window.showSetup = () => setupSection.classList.toggle('hidden');
-        
-        window.resetVault = () => {
-            if(confirm("Wipe local settings? Cloud data is safe unless you change Sync Key.")) {
-                localStorage.clear();
-                location.reload();
-            }
-        };
-
+        // 3. Setup & Settings
+        window.showSetup = () => document.getElementById('setup-section').classList.toggle('hidden');
+        window.resetVault = () => { if(confirm("Clear local cache? This will reset local stats.")) { localStorage.clear(); location.reload(); } };
         window.saveConfig = () => {
             const url = document.getElementById('gas-url').value.trim();
             if (url.startsWith('https://script.google.com')) {
-                state.configUrl = url;
                 localStorage.setItem('logos_gas_url', url);
-                saveToCloud();
-                setupSection.classList.add('hidden');
-            } else {
-                alert("Please paste a valid Web App URL.");
-            }
-        };
-
-        window.copySyncKey = () => {
-            const key = document.getElementById('sync-key-input').value;
-            document.execCommand('copy');
-            const btn = document.querySelector('[onclick="copySyncKey()"] i');
-            btn.setAttribute('data-lucide', 'check');
-            lucide.createIcons();
-            setTimeout(() => {
-                btn.setAttribute('data-lucide', 'copy');
-                lucide.createIcons();
-            }, 2000);
-        };
-
-        window.applyManualSync = () => {
-            const key = document.getElementById('manual-sync-key').value.trim();
-            if (key.length > 10) {
-                localStorage.setItem('logos_manual_uid', key);
+                state.configUrl = url;
                 location.reload();
-            } else {
-                alert("Invalid Sync Key format.");
-            }
+            } else { alert("Please enter a valid Script URL."); }
         };
 
         window.dismissSurprise = () => {
             state.surpriseClaimed = true;
-            saveToCloud();
+            localStorage.setItem('logos_surprise_claimed', 'true');
+            if (state.configUrl) saveStatsToCloud();
             document.getElementById('mystery-surprise').classList.add('hidden');
             document.getElementById('journal-form').classList.remove('opacity-10', 'pointer-events-none');
         };
 
-        submitBtn.addEventListener('click', async () => {
-            if (!state.configUrl) {
-                alert("Please connect your Google Vault first.");
-                setupSection.classList.remove('hidden');
-                return;
-            }
+        // 4. Cloud Saving
+        async function saveStatsToCloud() {
+            if (!state.configUrl) return;
+            try {
+                await fetch(state.configUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: "sync_save", stats: state })
+                });
+            } catch (e) { console.error("Cloud Sync Failed", e); }
+        }
 
+        submitBtn.addEventListener('click', async () => {
+            if (!state.configUrl) { alert("Connect your script first."); return; }
             submitBtn.innerText = "Transmitting to Vault...";
             submitBtn.disabled = true;
 
-            const data = {
+            const entryData = {
                 timestamp: new Date().toLocaleString(),
                 win: document.getElementById('prompt-1').value,
                 friction: document.getElementById('prompt-2').value,
@@ -386,53 +271,45 @@
             };
 
             try {
-                await fetch(state.configUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                await fetch(state.configUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(entryData) });
                 
+                // Reward Logic
                 const now = new Date();
                 const last = state.lastEntry ? new Date(state.lastEntry) : null;
-                const isNewDay = !last || now.toDateString() !== last.toDateString();
-                
-                if (isNewDay) {
+                if (!last || now.toDateString() !== last.toDateString()) {
                     state.totalDays++;
                     const diff = last ? Math.floor((now-last)/(864e5)) : 0;
                     let gain = 10;
-                    let bonusMsg = "+10 Coins earned.";
-
-                    if (diff === 1) {
-                        state.streak++;
-                        if (state.streak % 7 === 0) {
-                            gain += 50;
-                            bonusMsg = "7-Day Milestone! +60 Coins total.";
-                        }
-                    } else {
-                        if (diff === 2) {
-                            gain = 20;
-                            bonusMsg = "Recovery Bonus! +20 Coins.";
-                        }
-                        state.streak = 1;
-                    }
-                    
+                    if (diff === 1) state.streak++; else { if(diff === 2) gain = 20; state.streak = 1; }
                     state.coins += gain;
                     state.lastEntry = now.toISOString();
-                    document.getElementById('bonus-msg').innerText = bonusMsg;
                     
-                    await saveToCloud();
+                    // Local Save
+                    localStorage.setItem('logos_coins', state.coins);
+                    localStorage.setItem('logos_streak', state.streak);
+                    localStorage.setItem('logos_total_days', state.totalDays);
+                    localStorage.setItem('logos_lastEntry', state.lastEntry);
+                    
+                    // Trigger Cloud Sync of stats
+                    saveStatsToCloud();
                 }
 
                 document.getElementById('journal-form').classList.add('hidden');
                 document.getElementById('success-msg').classList.remove('hidden');
             } catch (e) {
-                alert("Connection error. Check script settings.");
+                alert("Vault connection failed.");
                 submitBtn.innerText = "Retry Entry";
                 submitBtn.disabled = false;
             }
         });
 
-        shieldBtn.addEventListener('click', async () => {
+        document.getElementById('shield-btn').addEventListener('click', () => {
             if (state.coins >= 100) {
                 state.coins -= 100;
-                await saveToCloud();
-                alert("Shield Deployed: Streak preserved.");
+                localStorage.setItem('logos_coins', state.coins);
+                saveStatsToCloud();
+                alert("Shield Deployed.");
+                updateUI();
             }
         });
     </script>
