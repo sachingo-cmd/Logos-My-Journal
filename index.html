@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logos | Disciplined Journaling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e5e5; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .input-focus:focus { outline: none; border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+        .limit-exceeded { border-color: #ef4444 !important; color: #ef4444 !important; }
+        .limit-warning { color: #f59e0b; }
+        .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+        .surprise-box { animation: float 3s ease-in-out infinite; }
+        .habit-marker { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #4b5563; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- Header / Stats -->
+    <header class="w-full max-w-2xl flex justify-between items-center mb-6">
+        <div class="flex items-center gap-2">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
+                <i data-lucide="book-open" class="text-white w-6 h-6"></i>
+            </div>
+            <h1 class="text-xl font-semibold tracking-tight">LOGOS</h1>
+        </div>
+        <div class="flex gap-3">
+            <div class="glass px-4 py-2 rounded-full flex items-center gap-2">
+                <i data-lucide="flame" class="text-orange-500 w-5 h-5"></i>
+                <span id="streak-display" class="font-bold text-sm">0</span>
+            </div>
+            <div class="glass px-4 py-2 rounded-full flex items-center gap-2">
+                <i data-lucide="coins" class="text-yellow-500 w-5 h-5"></i>
+                <span id="coin-display" class="font-bold text-sm">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 90-Day Progress Bar -->
+    <section class="w-full max-w-2xl mb-10 px-2">
+        <div class="flex justify-between items-end mb-2">
+            <div class="space-y-0.5">
+                <span id="habit-status-text" class="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">Initiating Habit</span>
+                <div class="text-lg font-bold"><span id="total-days-display">0</span> <span class="text-gray-600">/ 90 Days</span></div>
+            </div>
+            <span id="progress-percent" class="text-xs font-medium text-blue-400">0%</span>
+        </div>
+        <div class="relative w-full h-3 bg-white/5 rounded-full overflow-visible">
+            <!-- Marker for Day 66 -->
+            <div class="habit-marker" style="left: 73.33%;">
+                <div class="mb-1">66</div>
+                <div class="h-4 w-0.5 bg-gray-700 mx-auto"></div>
+            </div>
+            <!-- Progress Fill -->
+            <div id="habit-progress-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full progress-bar shadow-[0_0_15px_rgba(59,130,246,0.3)]" style="width: 0%"></div>
+        </div>
+        <p class="text-[9px] text-gray-600 mt-6 text-center italic">The "Automaticity Point" is Day 66. Keep going.</p>
+    </section>
+
+    <main class="w-full max-w-2xl space-y-6">
+        
+        <!-- Setup Guide -->
+        <section id="setup-section" class="glass p-6 rounded-2xl hidden mb-6 border-blue-500/30">
+            <h2 class="text-blue-400 font-semibold mb-2 flex items-center gap-2">
+                <i data-lucide="settings" class="w-4 h-4"></i> Initial Connection Required
+            </h2>
+            <p class="text-sm text-gray-400 mb-4">Provide your Google Apps Script Web App URL to enable cloud saving.</p>
+            <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/..." class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm mb-3 focus:border-blue-500 outline-none transition-all">
+            <button onclick="saveConfig()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition font-medium">Connect Vault</button>
+        </section>
+
+        <!-- Journal Form -->
+        <div id="journal-form" class="space-y-6 pb-20">
+            
+            <!-- Prompt 1: Micro Win -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. The Micro-Win</label>
+                    <span id="count-1" class="text-[10px] text-gray-600">0/20</span>
+                </div>
+                <textarea id="prompt-1" data-limit="20" placeholder="One thing that went right today..." 
+                    class="w-full glass rounded-xl p-4 min-h-[60px] resize-none input-focus transition-all text-sm"></textarea>
+            </div>
+
+            <!-- Prompt 2: Friction -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. The Friction</label>
+                    <span id="count-2" class="text-[10px] text-gray-600">0/20</span>
+                </div>
+                <textarea id="prompt-2" data-limit="20" placeholder="What felt heavy or off?" 
+                    class="w-full glass rounded-xl p-4 min-h-[60px] resize-none input-focus transition-all text-sm"></textarea>
+            </div>
+
+            <!-- Prompt 3: The Pivot -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. The Pivot</label>
+                    <span id="count-3" class="text-[10px] text-gray-600">0/20</span>
+                </div>
+                <textarea id="prompt-3" data-limit="20" placeholder="One thing you'd do differently?" 
+                    class="w-full glass rounded-xl p-4 min-h-[60px] resize-none input-focus transition-all text-sm"></textarea>
+            </div>
+
+            <!-- Prompt 4: Environment -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">4. Environment</label>
+                    <span id="count-4" class="text-[10px] text-gray-600">0/20</span>
+                </div>
+                <textarea id="prompt-4" data-limit="20" placeholder="Sleep, food, or space impact?" 
+                    class="w-full glass rounded-xl p-4 min-h-[60px] resize-none input-focus transition-all text-sm"></textarea>
+            </div>
+
+            <!-- Prompt 5: Brain Dump -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">5. Brain Dump (Catharsis)</label>
+                    <span id="count-5" class="text-[10px] text-gray-600 font-bold">0/250</span>
+                </div>
+                <div class="relative">
+                    <textarea id="prompt-5" data-limit="250" placeholder="Unfiltered thoughts. Be honest." 
+                        class="w-full glass rounded-xl p-4 min-h-[180px] resize-none input-focus transition-all text-sm"></textarea>
+                    <div id="brain-dump-progress" class="absolute bottom-0 left-0 h-1 bg-blue-600 rounded-b-xl progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-4 flex flex-col items-center gap-4">
+                <button id="submit-btn" disabled 
+                    class="w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold tracking-widest uppercase transition-all cursor-not-allowed text-xs">
+                    Complete Entry
+                </button>
+                
+                <button id="shield-btn" class="hidden text-[10px] flex items-center gap-2 text-gray-500 hover:text-white transition uppercase tracking-widest">
+                    <i data-lucide="shield-check" class="w-3 h-3 text-blue-400"></i>
+                    Activate Shield (100 Coins)
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Success Message -->
+        <div id="success-msg" class="hidden glass p-12 rounded-2xl text-center space-y-4">
+            <div class="flex justify-center">
+                <div class="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center">
+                    <i data-lucide="check" class="w-8 h-8"></i>
+                </div>
+            </div>
+            <h2 class="text-2xl font-bold">Vault Entry Locked</h2>
+            <p class="text-gray-400 text-sm">Data transmitted successfully. +10 Coins added.</p>
+            <div id="bonus-msg" class="text-blue-400 font-semibold text-sm"></div>
+            <button onclick="location.reload()" class="bg-white text-black px-8 py-3 rounded-full font-bold text-sm mt-4 hover:scale-105 transition">Finish Session</button>
+        </div>
+
+        <!-- THE SURPRISE UNLOCKED -->
+        <div id="mystery-surprise" class="hidden glass p-8 border-yellow-500/50 rounded-3xl text-center space-y-6 surprise-box">
+             <i data-lucide="star" class="w-12 h-12 text-yellow-500 mx-auto fill-yellow-500/20"></i>
+             <div class="space-y-2">
+                <h2 class="text-xl font-bold text-yellow-400 italic">"THE ARCHIVIST" AWAKENED</h2>
+                <p class="text-xs text-gray-400 px-4">100 Coins achieved. You have unlocked AI-Readiness. Your data is now structured for high-level pattern recognition.</p>
+             </div>
+             <button onclick="dismissSurprise()" class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition">Claim Identity</button>
+        </div>
+
+    </main>
+
+    <script>
+        // State Management
+        let state = {
+            coins: parseInt(localStorage.getItem('logos_coins')) || 0,
+            streak: parseInt(localStorage.getItem('logos_streak')) || 0,
+            totalDays: parseInt(localStorage.getItem('logos_total_days')) || 0,
+            lastEntry: localStorage.getItem('logos_lastEntry') || null,
+            configUrl: localStorage.getItem('logos_gas_url') || null,
+            surpriseClaimed: localStorage.getItem('logos_surprise_claimed') === 'true'
+        };
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Check for configuration
+        if (!state.configUrl) {
+            document.getElementById('setup-section').classList.remove('hidden');
+        }
+
+        function saveConfig() {
+            const url = document.getElementById('gas-url').value.trim();
+            if (url) {
+                localStorage.setItem('logos_gas_url', url);
+                state.configUrl = url;
+                document.getElementById('setup-section').classList.add('hidden');
+            }
+        }
+
+        // DOM Elements
+        const textareas = document.querySelectorAll('textarea');
+        const submitBtn = document.getElementById('submit-btn');
+        const coinDisp = document.getElementById('coin-display');
+        const streakDisp = document.getElementById('streak-display');
+        const shieldBtn = document.getElementById('shield-btn');
+        const habitBar = document.getElementById('habit-progress-bar');
+        const totalDaysDisp = document.getElementById('total-days-display');
+        const percentDisp = document.getElementById('progress-percent');
+        const statusText = document.getElementById('habit-status-text');
+
+        // Update UI
+        function updateStats() {
+            coinDisp.innerText = state.coins;
+            streakDisp.innerText = state.streak;
+            totalDaysDisp.innerText = state.totalDays;
+            
+            // Progress Logic
+            const progress = Math.min((state.totalDays / 90) * 100, 100);
+            habitBar.style.width = `${progress}%`;
+            percentDisp.innerText = `${Math.floor(progress)}%`;
+
+            // Status Text Logic
+            if (state.totalDays >= 90) statusText.innerText = "Habit Solidified";
+            else if (state.totalDays >= 66) statusText.innerText = "Automaticity Zone";
+            else if (state.totalDays >= 30) statusText.innerText = "Building Momentum";
+            else statusText.innerText = "Initiating Habit";
+
+            if (state.coins >= 100) shieldBtn.classList.remove('hidden');
+            
+            // Surprise Trigger
+            if (state.coins >= 100 && !state.surpriseClaimed) {
+                document.getElementById('mystery-surprise').classList.remove('hidden');
+                document.getElementById('journal-form').classList.add('opacity-10', 'pointer-events-none');
+            }
+        }
+
+        function dismissSurprise() {
+            localStorage.setItem('logos_surprise_claimed', 'true');
+            state.surpriseClaimed = true;
+            document.getElementById('mystery-surprise').classList.add('hidden');
+            document.getElementById('journal-form').classList.remove('opacity-10', 'pointer-events-none');
+        }
+
+        updateStats();
+
+        // Validation
+        function validate() {
+            let allValid = true;
+            textareas.forEach(ta => {
+                const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+                const limit = parseInt(ta.dataset.limit);
+                const countDisplay = document.getElementById(`count-${ta.id.split('-')[1]}`);
+                
+                countDisplay.innerText = `${words}/${limit}`;
+                
+                if (words > limit) {
+                    ta.classList.add('limit-exceeded');
+                    countDisplay.classList.add('limit-exceeded');
+                    allValid = false;
+                } else {
+                    ta.classList.remove('limit-exceeded');
+                    countDisplay.classList.remove('limit-exceeded');
+                    if (words === 0) allValid = false;
+                }
+
+                if (ta.id === 'prompt-5') {
+                    const percent = Math.min((words / limit) * 100, 100);
+                    document.getElementById('brain-dump-progress').style.width = `${percent}%`;
+                }
+            });
+
+            if (allValid) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+                submitBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg', 'shadow-blue-600/20');
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+                submitBtn.classList.remove('bg-blue-600', 'text-white');
+            }
+        }
+
+        textareas.forEach(ta => ta.addEventListener('input', validate));
+
+        // Submit Logic
+        submitBtn.addEventListener('click', async () => {
+            if (!state.configUrl) {
+                alert("Please connect your Google Vault first.");
+                document.getElementById('setup-section').classList.remove('hidden');
+                return;
+            }
+
+            const data = {
+                timestamp: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+                win: document.getElementById('prompt-1').value,
+                friction: document.getElementById('prompt-2').value,
+                pivot: document.getElementById('prompt-3').value,
+                environment: document.getElementById('prompt-4').value,
+                dump: document.getElementById('prompt-5').value
+            };
+
+            submitBtn.innerText = "Securing...";
+            submitBtn.disabled = true;
+
+            try {
+                await fetch(state.configUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                processRewards();
+                document.getElementById('journal-form').classList.add('hidden');
+                document.getElementById('success-msg').classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                alert("Transmission interrupted. Check your link.");
+                submitBtn.innerText = "Retry Entry";
+                submitBtn.disabled = false;
+            }
+        });
+
+        function processRewards() {
+            const now = new Date();
+            const last = state.lastEntry ? new Date(state.lastEntry) : null;
+            
+            // Check if entry is on a different day to avoid spamming coins
+            const isNewDay = !last || now.toDateString() !== last.toDateString();
+            
+            if (isNewDay) {
+                state.totalDays += 1; // Increment progress bar
+                
+                const diffDays = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : 0;
+                let coinGain = 10;
+                let bonusText = "";
+
+                if (diffDays === 1) {
+                    state.streak += 1;
+                    if (state.streak % 7 === 0) {
+                        coinGain += 50;
+                        bonusText = "7-Day Milestone: +50 Coins!";
+                    }
+                } else {
+                    if (diffDays === 2) {
+                        coinGain = 20;
+                        bonusText = "Recovery Bonus: +20 Coins";
+                    }
+                    state.streak = 1;
+                }
+
+                state.coins += coinGain;
+                state.lastEntry = now.toISOString();
+                
+                localStorage.setItem('logos_coins', state.coins);
+                localStorage.setItem('logos_streak', state.streak);
+                localStorage.setItem('logos_total_days', state.totalDays);
+                localStorage.setItem('logos_lastEntry', state.lastEntry);
+                
+                document.getElementById('bonus-msg').innerText = bonusText;
+            }
+            updateStats();
+        }
+
+        shieldBtn.addEventListener('click', () => {
+            if (state.coins >= 100) {
+                state.coins -= 100;
+                localStorage.setItem('logos_coins', state.coins);
+                updateStats();
+                alert("Shield Deployed: Streak preserved for 24 hours.");
+            }
+        });
+
+    </script>
+</body>
+</html>
