@@ -22,10 +22,10 @@
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
-    <!-- Sync Loading Overlay (Fades out quickly) -->
+    <!-- Sync Loading Overlay -->
     <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
         <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-xs uppercase tracking-[0.3em] text-blue-500 font-bold">Synchronizing...</p>
+        <p class="text-xs uppercase tracking-[0.3em] text-blue-500 font-bold">Synchronizing Progress...</p>
     </div>
 
     <!-- Header -->
@@ -52,7 +52,7 @@
     <section class="w-full max-w-2xl mb-10 px-2">
         <div class="flex justify-between items-end mb-2">
             <div class="space-y-0.5">
-                <span id="habit-status-text" class="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">Initializing</span>
+                <span id="habit-status-text" class="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">Initiating</span>
                 <div class="text-lg font-bold"><span id="total-days-display">0</span> <span class="text-gray-600">/ 90 Days</span></div>
             </div>
             <span id="progress-percent" class="text-xs font-medium text-blue-400">0%</span>
@@ -74,7 +74,7 @@
                 <h2 class="text-blue-400 font-semibold flex items-center gap-2">
                     <i data-lucide="shield-check" class="w-4 h-4"></i> Secure Connection
                 </h2>
-                <button onclick="resetVault()" class="text-[9px] text-gray-600 hover:text-red-400 uppercase tracking-widest">Reset All</button>
+                <button onclick="resetVault()" class="text-[9px] text-gray-600 hover:text-red-400 uppercase tracking-widest">Reset Local Cache</button>
             </div>
             <p class="text-xs text-gray-500 mb-4">Paste your Google Script URL to enable cloud-sync across devices.</p>
             <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm mb-3 focus:border-blue-500 outline-none transition-all">
@@ -158,26 +158,35 @@
 
         lucide.createIcons();
 
-        // 1. Connection & Loading Logic
+        // 1. Connection & Cloud Sync Logic
         async function initSync() {
             if (state.configUrl) {
                 try {
-                    const response = await fetch(state.configUrl, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({ action: "sync_load" })
-                    });
+                    // We use GET to download data because GAS handles GET redirects better for reading
+                    const response = await fetch(state.configUrl);
+                    const text = await response.text();
                     
-                    // Note: NO-CORS mode makes response opaque, but we can try a workaround 
-                    // or stick to regular behavior. For the best sync, we'll push local to cloud 
-                    // on every submit, and cloud to local on app load if possible.
-                } catch (e) { console.error("Sync Error", e); }
+                    if (text && text !== "none" && !text.includes("Error")) {
+                        const cloudData = JSON.parse(text);
+                        // Update state with cloud data
+                        state = { ...state, ...cloudData };
+                        
+                        // Sync local cache with cloud
+                        localStorage.setItem('logos_coins', state.coins);
+                        localStorage.setItem('logos_streak', state.streak);
+                        localStorage.setItem('logos_total_days', state.totalDays);
+                        localStorage.setItem('logos_lastEntry', state.lastEntry);
+                        localStorage.setItem('logos_surprise_claimed', state.surpriseClaimed);
+                    }
+                } catch (e) { 
+                    console.error("Cloud Load Failed", e); 
+                }
             }
             
             setTimeout(() => {
                 document.getElementById('sync-overlay').classList.add('opacity-0', 'pointer-events-none');
                 updateUI();
-            }, 800);
+            }, 600);
         }
 
         initSync();
@@ -193,7 +202,7 @@
 
             if (state.totalDays >= 90) document.getElementById('habit-status-text').innerText = "Habit Solidified";
             else if (state.totalDays >= 66) document.getElementById('habit-status-text').innerText = "Automaticity Zone";
-            else if (state.totalDays >= 30) document.getElementById('habit-status-text').innerText = "Building Momentum";
+            else if (state.totalDays >= 30) document.getElementById('habit-status-text').innerText = "Momentum Building";
             else document.getElementById('habit-status-text').innerText = "Initiating";
 
             if (state.coins >= 100) document.getElementById('shield-btn').classList.remove('hidden');
@@ -220,13 +229,13 @@
                 if (ta.id === 'prompt-5') document.getElementById('dump-progress').style.width = `${Math.min((words/limit)*100, 100)}%`;
             });
             submitBtn.disabled = !allValid;
-            submitBtn.className = allValid ? "w-full py-4 rounded-xl bg-blue-600 text-white font-bold tracking-widest uppercase text-xs" : "w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold tracking-widest uppercase text-xs";
+            submitBtn.className = allValid ? "w-full py-4 rounded-xl bg-blue-600 text-white font-bold tracking-widest uppercase text-xs shadow-lg" : "w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold tracking-widest uppercase text-xs cursor-not-allowed";
         }
         textareas.forEach(ta => ta.addEventListener('input', validate));
 
-        // 3. Setup & Settings
+        // 3. Setup & Reset
         window.showSetup = () => document.getElementById('setup-section').classList.toggle('hidden');
-        window.resetVault = () => { if(confirm("Clear local cache? This will reset local stats.")) { localStorage.clear(); location.reload(); } };
+        window.resetVault = () => { if(confirm("This will clear local stats and disconnect your URL. Proceed?")) { localStorage.clear(); location.reload(); } };
         window.saveConfig = () => {
             const url = document.getElementById('gas-url').value.trim();
             if (url.startsWith('https://script.google.com')) {
@@ -239,12 +248,12 @@
         window.dismissSurprise = () => {
             state.surpriseClaimed = true;
             localStorage.setItem('logos_surprise_claimed', 'true');
-            if (state.configUrl) saveStatsToCloud();
+            saveStatsToCloud();
             document.getElementById('mystery-surprise').classList.add('hidden');
             document.getElementById('journal-form').classList.remove('opacity-10', 'pointer-events-none');
         };
 
-        // 4. Cloud Saving
+        // 4. Saving Stats
         async function saveStatsToCloud() {
             if (!state.configUrl) return;
             try {
@@ -253,7 +262,7 @@
                     mode: 'no-cors',
                     body: JSON.stringify({ action: "sync_save", stats: state })
                 });
-            } catch (e) { console.error("Cloud Sync Failed", e); }
+            } catch (e) { console.error("Cloud Backup Failed", e); }
         }
 
         submitBtn.addEventListener('click', async () => {
@@ -273,25 +282,38 @@
             try {
                 await fetch(state.configUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(entryData) });
                 
-                // Reward Logic
                 const now = new Date();
                 const last = state.lastEntry ? new Date(state.lastEntry) : null;
                 if (!last || now.toDateString() !== last.toDateString()) {
                     state.totalDays++;
                     const diff = last ? Math.floor((now-last)/(864e5)) : 0;
                     let gain = 10;
-                    if (diff === 1) state.streak++; else { if(diff === 2) gain = 20; state.streak = 1; }
+                    let bonusMsg = "+10 Coins earned.";
+
+                    if (diff === 1) {
+                        state.streak++;
+                        if (state.streak % 7 === 0) {
+                            gain += 50;
+                            bonusMsg = "7-Day Milestone! +60 Coins total.";
+                        }
+                    } else {
+                        if (diff === 2) {
+                            gain = 20;
+                            bonusMsg = "Recovery Bonus! +20 Coins.";
+                        }
+                        state.streak = 1;
+                    }
+                    
                     state.coins += gain;
                     state.lastEntry = now.toISOString();
                     
-                    // Local Save
                     localStorage.setItem('logos_coins', state.coins);
                     localStorage.setItem('logos_streak', state.streak);
                     localStorage.setItem('logos_total_days', state.totalDays);
                     localStorage.setItem('logos_lastEntry', state.lastEntry);
                     
-                    // Trigger Cloud Sync of stats
                     saveStatsToCloud();
+                    document.getElementById('bonus-msg').innerText = bonusMsg;
                 }
 
                 document.getElementById('journal-form').classList.add('hidden');
