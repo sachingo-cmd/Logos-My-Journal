@@ -10,14 +10,30 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e5e5; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .input-focus:focus { outline: none; border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+        .limit-exceeded { border-color: #ef4444 !important; color: #ef4444 !important; }
         .progress-bar { transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
-        .input-focus:focus { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); outline: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .habit-marker { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #4b5563; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
+    <!-- Sync Loading Overlay -->
+    <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
+        <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs uppercase tracking-[0.3em] text-blue-500 font-bold">Synchronizing Progress...</p>
+    </div>
+
+    <!-- Header -->
     <header class="w-full max-w-2xl flex justify-between items-center mb-8">
-        <h1 class="text-xl font-bold tracking-tighter text-blue-500 uppercase">Logos</h1>
+        <div class="flex items-center gap-2">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
+                <i data-lucide="book-open" class="text-white w-6 h-6"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tighter text-white uppercase">Logos</h1>
+        </div>
         <div class="flex gap-3">
             <div class="glass px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold">
                 <i data-lucide="flame" class="text-orange-500 w-4 h-4"></i> <span id="streak-disp">0</span>
@@ -28,96 +44,119 @@
         </div>
     </header>
 
+    <!-- Habit Progress -->
     <section class="w-full max-w-2xl mb-10 px-2">
-        <div class="flex justify-between items-end mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+        <div class="flex justify-between items-end mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
             <span id="habit-status">Initiating</span>
-            <span>Day <span id="days-disp">0</span> / 90</span>
+            <span><span id="days-disp">0</span> / 90 Days</span>
         </div>
-        <div class="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-            <div id="progress-bar" class="h-full bg-blue-600 progress-bar shadow-[0_0_15px_rgba(59,130,246,0.3)]" style="width: 0%"></div>
+        <div class="relative w-full h-2 bg-white/5 rounded-full">
+            <div class="habit-marker" style="left: 73.33%;">
+                <div class="mb-1">66</div>
+                <div class="h-3 w-0.5 bg-gray-700 mx-auto"></div>
+            </div>
+            <div id="progress-bar" class="absolute top-0 left-0 h-full bg-blue-600 rounded-full progress-bar shadow-[0_0_15px_rgba(59,130,246,0.4)]" style="width: 0%"></div>
         </div>
     </section>
 
-    <main class="w-full max-w-2xl">
-        <div id="setup-ui" class="glass p-6 rounded-2xl hidden mb-6 border-blue-500/30">
-            <h2 class="text-blue-400 font-bold text-sm uppercase tracking-widest mb-4">Vault Connection</h2>
-            <input type="text" id="gas-url" placeholder="Paste Web App URL here..." class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm mb-4 outline-none focus:border-blue-500">
+    <main class="w-full max-w-2xl space-y-6">
+        
+        <!-- Connection Setup -->
+        <section id="setup-ui" class="glass p-6 rounded-2xl hidden mb-6 border-blue-500/30">
+            <h2 class="text-blue-400 font-bold text-xs uppercase tracking-widest mb-4">Vault Connection</h2>
+            <input type="text" id="gas-url" placeholder="Paste Web App URL here..." class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm mb-4 outline-none focus:border-blue-500 transition-all">
             <div class="flex gap-2">
-                <button onclick="saveConfig()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold uppercase text-[10px]">Connect & Sync</button>
-                <button onclick="testAdvanceDay()" class="px-4 bg-white/5 text-gray-400 rounded-xl text-[10px] font-bold uppercase">Test: +1 Day</button>
+                <button onclick="saveConfig()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold uppercase text-[10px] tracking-widest">Connect & Sync</button>
+                <button onclick="testAdvanceDay()" class="px-4 bg-white/5 text-gray-400 hover:text-white rounded-xl text-[10px] font-bold uppercase transition">Simulate Tomorrow</button>
             </div>
-        </div>
+            <div class="mt-4 flex justify-between">
+                <button onclick="resetLocal()" class="text-[9px] text-gray-600 hover:text-red-400 uppercase tracking-widest">Wipe Local Cache</button>
+            </div>
+        </section>
 
-        <div id="form-ui" class="space-y-6 pb-20">
+        <!-- Form -->
+        <div id="journal-form" class="space-y-6 pb-20">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-gray-600 uppercase">1. Win</label>
-                    <textarea id="p1" placeholder="..." class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Micro-Win</label><span id="c1" class="text-[9px] text-gray-700">0/20</span></div>
+                    <textarea id="p1" data-limit="20" placeholder="One thing that went right today?" class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
                 </div>
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-gray-600 uppercase">2. Friction</label>
-                    <textarea id="p2" placeholder="..." class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Friction</label><span id="c2" class="text-[9px] text-gray-700">0/20</span></div>
+                    <textarea id="p2" data-limit="20" placeholder="What felt heavy or off?" class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
                 </div>
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-gray-600 uppercase">3. Pivot</label>
-                    <textarea id="p3" placeholder="..." class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. Pivot</label><span id="c3" class="text-[9px] text-gray-700">0/20</span></div>
+                    <textarea id="p3" data-limit="20" placeholder="One thing you'd do differently?" class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
                 </div>
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-gray-600 uppercase">4. Env</label>
-                    <textarea id="p4" placeholder="..." class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">4. Environment</label><span id="c4" class="text-[9px] text-gray-700">0/20</span></div>
+                    <textarea id="p4" data-limit="20" placeholder="Did sleep, food, or space affect you?" class="w-full glass rounded-xl p-3 min-h-[60px] resize-none input-focus text-sm"></textarea>
                 </div>
             </div>
-            <div class="space-y-1">
-                <label class="text-[10px] font-bold text-gray-600 uppercase tracking-widest">5. Brain Dump</label>
-                <textarea id="p5" placeholder="..." class="w-full glass rounded-xl p-4 min-h-[180px] resize-none input-focus text-sm"></textarea>
+
+            <div class="space-y-2">
+                <div class="flex justify-between"><label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">5. Brain Dump (Catharsis)</label><span id="c5" class="text-[10px] text-gray-600 font-bold">0/250</span></div>
+                <textarea id="p5" data-limit="250" placeholder="Unfiltered thoughts. No filters..." class="w-full glass rounded-xl p-4 min-h-[180px] resize-none input-focus text-sm"></textarea>
             </div>
+
             <button id="submit-btn" disabled class="w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold uppercase text-xs tracking-widest transition-all">Lock Entry</button>
         </div>
 
-        <div id="success-ui" class="hidden glass p-12 rounded-3xl text-center space-y-4">
+        <!-- Success -->
+        <div id="success-ui" class="hidden glass p-12 rounded-3xl text-center space-y-6">
             <div class="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto"><i data-lucide="check" class="w-8 h-8"></i></div>
-            <h2 class="text-xl font-bold uppercase tracking-tighter">Vault Updated</h2>
-            <button onclick="location.reload()" class="bg-white text-black px-10 py-3 rounded-full font-bold text-xs uppercase shadow-xl">Finish</button>
+            <div class="space-y-2">
+                <h2 class="text-2xl font-bold uppercase tracking-tighter italic">Vault Updated</h2>
+                <p class="text-xs text-gray-400">Progress synced across all devices.</p>
+            </div>
+            <button onclick="location.reload()" class="bg-white text-black px-12 py-3 rounded-full font-bold text-xs uppercase shadow-2xl hover:scale-105 transition">Finish Session</button>
         </div>
     </main>
 
-    <footer class="mt-auto py-8">
-        <button onclick="document.getElementById('setup-ui').classList.toggle('hidden')" class="text-[9px] text-gray-700 hover:text-blue-500 uppercase tracking-[0.3em] flex items-center gap-2"><i data-lucide="settings" class="w-3 h-3"></i> Settings & Sync</button>
+    <footer class="mt-auto py-8 text-center">
+        <button onclick="document.getElementById('setup-ui').classList.toggle('hidden')" class="text-[9px] text-gray-700 hover:text-blue-500 uppercase tracking-[0.3em] flex items-center gap-2 mx-auto">
+            <i data-lucide="settings" class="w-3 h-3"></i> Connection Settings
+        </button>
     </footer>
 
     <script>
         let state = { 
-            coins: parseInt(localStorage.getItem('logos_c')) || 0, 
-            streak: parseInt(localStorage.getItem('logos_s')) || 0, 
-            totalDays: parseInt(localStorage.getItem('logos_d')) || 0, 
-            lastEntry: localStorage.getItem('logos_e') || null, 
-            url: localStorage.getItem('logos_u') || '' 
+            coins: parseInt(localStorage.getItem('lc')) || 0, 
+            streak: parseInt(localStorage.getItem('ls')) || 0, 
+            totalDays: parseInt(localStorage.getItem('ld')) || 0, 
+            lastEntry: localStorage.getItem('le') || null, 
+            url: localStorage.getItem('lu') || '' 
         };
 
         async function init() {
             lucide.createIcons();
-            if (!state.url) {
-                document.getElementById('setup-ui').classList.remove('hidden');
-            } else {
+            const overlay = document.getElementById('sync-overlay');
+            const safety = setTimeout(() => { overlay.classList.add('opacity-0', 'pointer-events-none'); updateUI(); }, 2000);
+
+            if (state.url) {
                 try {
-                    const res = await fetch(state.url);
+                    const res = await fetch(state.url + "?t=" + Date.now());
                     const txt = await res.text();
                     if (txt && txt !== "none" && !txt.includes("<!")) {
                         const cloud = JSON.parse(txt);
                         state = { ...state, ...cloud };
                         saveLocal();
                     }
-                } catch(e) { console.error("Sync failed", e); }
+                } catch(e) { console.warn("Local mode active"); }
+            } else {
+                document.getElementById('setup-ui').classList.remove('hidden');
             }
+            
+            clearTimeout(safety);
+            overlay.classList.add('opacity-0', 'pointer-events-none');
             updateUI();
         }
 
         function saveLocal() {
-            localStorage.setItem('logos_c', state.coins);
-            localStorage.setItem('logos_s', state.streak);
-            localStorage.setItem('logos_d', state.totalDays);
-            localStorage.setItem('logos_e', state.lastEntry);
-            localStorage.setItem('logos_u', state.url);
+            localStorage.setItem('lc', state.coins); localStorage.setItem('ls', state.streak);
+            localStorage.setItem('ld', state.totalDays); localStorage.setItem('le', state.lastEntry);
+            localStorage.setItem('lu', state.url);
         }
 
         function updateUI() {
@@ -127,56 +166,62 @@
             const p = Math.min((state.totalDays / 90) * 100, 100);
             document.getElementById('progress-bar').style.width = p + '%';
             if (state.totalDays >= 66) document.getElementById('habit-status').innerText = "Automaticity";
-            else if (state.totalDays >= 30) document.getElementById('habit-status').innerText = "Momentum";
+            else if (state.totalDays >= 30) document.getElementById('habit-status').innerText = "Momentum Building";
         }
 
         function saveConfig() {
             const val = document.getElementById('gas-url').value.trim();
-            if (val.includes('script.google.com')) { localStorage.setItem('logos_u', val); location.reload(); }
+            if (val.includes('script.google.com')) { localStorage.setItem('lu', val); location.reload(); }
         }
 
         function testAdvanceDay() {
             state.lastEntry = "2000-01-01T00:00:00.000Z";
             saveLocal();
-            alert("Date reset for testing. Your next submission will count as a new day.");
+            alert("Day reset for testing. Your next entry will count as a new day.");
             location.reload();
         }
+
+        function resetLocal() { if(confirm("Clear local cache?")) { localStorage.clear(); location.reload(); } }
 
         const tas = [document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3'), document.getElementById('p4'), document.getElementById('p5')];
         const btn = document.getElementById('submit-btn');
         
-        const checkValid = () => {
-            const allFilled = tas.every(t => t.value.trim().length > 0);
-            btn.disabled = !allFilled;
-            btn.className = allFilled ? "w-full py-4 rounded-xl bg-blue-600 text-white font-bold uppercase text-xs tracking-widest" : "w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold uppercase text-xs tracking-widest";
+        const validate = () => {
+            let allValid = true;
+            tas.forEach((t, i) => {
+                const words = t.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const limit = parseInt(t.dataset.limit);
+                document.getElementById('c' + (i+1)).innerText = `${words}/${limit}`;
+                if (words === 0 || words > limit) {
+                    t.classList.toggle('limit-exceeded', words > limit);
+                    allValid = false;
+                } else { t.classList.remove('limit-exceeded'); }
+            });
+            btn.disabled = !allValid;
+            btn.className = allValid ? "w-full py-4 rounded-xl bg-blue-600 text-white font-bold uppercase text-xs tracking-widest shadow-xl" : "w-full py-4 rounded-xl bg-gray-800 text-gray-500 font-bold uppercase text-xs tracking-widest";
         };
-        tas.forEach(t => t.addEventListener('input', checkValid));
+        tas.forEach(t => t.addEventListener('input', validate));
 
         btn.addEventListener('click', async () => {
+            if (!state.url) return alert("Link Vault first.");
             btn.innerText = "TRANSMITTING..."; btn.disabled = true;
             const entry = { timestamp: new Date().toLocaleString(), win: tas[0].value, friction: tas[1].value, pivot: tas[2].value, environment: tas[3].value, dump: tas[4].value };
             
             try {
                 await fetch(state.url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(entry) });
-                
                 const now = new Date();
                 const last = state.lastEntry ? new Date(state.lastEntry) : null;
                 
                 if (!last || now.toDateString() !== last.toDateString()) {
                     state.totalDays++;
                     state.streak = (last && Math.floor((now-last)/864e5) === 1) ? state.streak + 1 : 1;
-                    state.coins += 10;
-                    state.lastEntry = now.toISOString();
+                    state.coins += 10; state.lastEntry = now.toISOString();
                     saveLocal();
                     await fetch(state.url, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "sync_save", stats: state }) });
                 }
-
-                document.getElementById('form-ui').classList.add('hidden');
+                document.getElementById('journal-form').classList.add('hidden');
                 document.getElementById('success-ui').classList.remove('hidden');
-            } catch(e) { 
-                alert("Connection failed. Check your Web App URL."); 
-                btn.innerText = "RETRY"; btn.disabled = false; 
-            }
+            } catch(e) { alert("Link Error. Check URL."); btn.innerText = "RETRY"; btn.disabled = false; }
         });
 
         init();
