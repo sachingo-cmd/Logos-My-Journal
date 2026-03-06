@@ -25,13 +25,13 @@
     <!-- Sync Loading Overlay -->
     <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
         <div class="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-[10px] uppercase tracking-[0.3em] text-blue-500 font-bold">Connecting to Cloud Vault...</p>
+        <p id="sync-text" class="text-[10px] uppercase tracking-[0.3em] text-blue-500 font-bold">Connecting to Cloud Vault...</p>
     </div>
 
     <!-- Header -->
     <header class="w-full max-w-2xl flex justify-between items-center mb-8">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 ring-1 ring-blue-400/30">
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 ring-1 ring-blue-400/30">
                 <i data-lucide="book-open" class="text-white w-5 h-5"></i>
             </div>
             <h1 class="text-xl font-bold tracking-tighter text-white uppercase italic">Logos</h1>
@@ -68,7 +68,7 @@
             <div class="bg-white/5 border border-yellow-500/30 p-8 rounded-[2.5rem] text-center space-y-6 animate-fade-in max-w-xs shadow-2xl shadow-yellow-500/10">
                 <i data-lucide="star" class="w-12 h-12 text-yellow-500 mx-auto fill-yellow-500/20"></i>
                 <div class="space-y-2">
-                    <h2 class="text-xl font-bold text-yellow-500 italic uppercase tracking-tighter">"The Archivist" Awakened</h2>
+                    <h2 class="text-xl font-bold text-yellow-400 italic uppercase tracking-tighter">"The Archivist" Awakened</h2>
                     <p class="text-[10px] leading-relaxed text-gray-400 uppercase tracking-widest">100 Coins achieved. You have unlocked high-level pattern recognition.</p>
                 </div>
                 <button onclick="dismissSurprise()" class="w-full py-3 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-yellow-500 hover:text-black transition">
@@ -80,7 +80,6 @@
         <!-- Journal Form -->
         <div id="form-container" class="space-y-8 animate-fade-in">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Prompts 1-4 -->
                 <div class="space-y-2">
                     <div class="flex justify-between px-1">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">1. Micro-Win</label>
@@ -111,7 +110,6 @@
                 </div>
             </div>
 
-            <!-- Brain Dump -->
             <div class="space-y-2">
                 <div class="flex justify-between px-1">
                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">5. Brain Dump (Catharsis)</label>
@@ -156,7 +154,7 @@
             </button>
             
             <div class="space-y-6">
-                <h2 class="text-blue-400 font-bold uppercase tracking-[0.2em] text-[10px]">Cloud Configuration</h2>
+                <h2 class="text-blue-400 font-bold uppercase tracking-[0.2em] text-[10px]">System Configuration</h2>
                 
                 <div class="space-y-2">
                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Google Script URL</label>
@@ -168,20 +166,22 @@
                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Device Sync Key</label>
                     <div class="flex gap-2">
                         <div id="user-id-display" class="flex-1 bg-black/40 border border-white/5 rounded-xl p-4 text-[10px] font-mono text-blue-400 truncate">
-                            Authenticating...
+                            Offline Mode
                         </div>
                         <button onclick="copySyncKey()" class="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition border border-white/5">
                             <i data-lucide="copy" class="w-4 h-4"></i>
                         </button>
                     </div>
-                    <p class="text-[9px] text-gray-600 leading-relaxed italic uppercase tracking-tighter">
-                        Link other devices by pasting this key there.
-                    </p>
                 </div>
 
-                <button onclick="linkNewDevice()" class="w-full py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition shadow-lg">
-                    Link External Device
-                </button>
+                <div class="flex flex-col gap-3">
+                    <button onclick="linkNewDevice()" class="w-full py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition">
+                        Link External Device
+                    </button>
+                    <button onclick="simulateTomorrow()" class="w-full py-3 bg-white/5 text-gray-500 rounded-xl text-[10px] font-bold uppercase hover:text-white transition">
+                        Simulate Tomorrow
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -199,61 +199,92 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-        // Firebase Config
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'logos-journal-v1';
-
-        // App State
-        let currentUser = null;
+        // Global state with local fallbacks
         let stats = {
-            coins: 0,
-            streak: 0,
-            totalDays: 0,
-            lastEntry: null,
+            coins: parseInt(localStorage.getItem('logos_coins')) || 0,
+            streak: parseInt(localStorage.getItem('logos_streak')) || 0,
+            totalDays: parseInt(localStorage.getItem('logos_total_days')) || 0,
+            lastEntry: localStorage.getItem('logos_lastEntry') || null,
             gasUrl: localStorage.getItem('logos_gas_url') || '',
             surpriseClaimed: localStorage.getItem('logos_surprise_claimed') === 'true'
         };
 
-        // Initialize UI
-        lucide.createIcons();
+        let currentUser = null;
+        let db = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'logos-journal-v1';
 
-        // RULE 3: Auth first
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) { console.error(e); }
+        // Fail-safe: Hide overlay after 3 seconds no matter what
+        const hideOverlay = () => {
+            document.getElementById('sync-overlay').classList.add('opacity-0', 'pointer-events-none');
+            updateUI();
+        };
+        const syncTimeout = setTimeout(() => {
+            console.log("Database connection timed out. Using local data.");
+            document.getElementById('sync-text').innerText = "Running in Offline Mode...";
+            hideOverlay();
+        }, 3000);
+
+        // Firebase Initialization
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                };
+                initAuth();
+
+                onAuthStateChanged(auth, (user) => {
+                    if (!user) return;
+                    currentUser = user;
+                    document.getElementById('user-id-display').innerText = user.uid;
+                    
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
+                    onSnapshot(docRef, (snap) => {
+                        clearTimeout(syncTimeout);
+                        if (snap.exists()) {
+                            const cloudData = snap.data();
+                            // Don't overwrite lastEntry if we are in a test session
+                            if (localStorage.getItem('test_mode') === 'true') {
+                                stats = { ...stats, coins: cloudData.coins, streak: cloudData.streak, totalDays: cloudData.totalDays };
+                            } else {
+                                stats = { ...stats, ...cloudData };
+                            }
+                            saveLocal();
+                        } else {
+                            setDoc(docRef, { ...stats });
+                        }
+                        hideOverlay();
+                    }, (err) => {
+                        console.warn("Firestore access restricted or failed.", err);
+                        hideOverlay();
+                    });
+                });
+            } else {
+                console.log("No Firebase config found. App is in standalone mode.");
+                hideOverlay();
+            }
+        } catch (e) {
+            console.error("Initialization Error:", e);
+            hideOverlay();
         }
 
-        onAuthStateChanged(auth, (user) => {
-            if (!user) return;
-            currentUser = user;
-            document.getElementById('user-id-display').innerText = user.uid;
-            
-            // RULE 1: Strict Paths
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-            
-            onSnapshot(docRef, (snap) => {
-                if (snap.exists()) {
-                    stats = { ...stats, ...snap.data() };
-                    updateUI();
-                } else {
-                    // Init user if not found
-                    setDoc(docRef, { coins: 0, streak: 0, totalDays: 0, lastEntry: null, gasUrl: stats.gasUrl, surpriseClaimed: false });
-                }
-                document.getElementById('sync-overlay').classList.add('opacity-0', 'pointer-events-none');
-            });
-        });
+        function saveLocal() {
+            localStorage.setItem('logos_coins', stats.coins);
+            localStorage.setItem('logos_streak', stats.streak);
+            localStorage.setItem('logos_total_days', stats.totalDays);
+            localStorage.setItem('logos_lastEntry', stats.lastEntry);
+            localStorage.setItem('logos_surprise_claimed', stats.surpriseClaimed);
+            updateUI();
+        }
 
-        initAuth();
-
-        // UI Logic
         window.updateUI = function() {
             document.getElementById('coin-disp').innerText = stats.coins;
             document.getElementById('streak-disp').innerText = stats.streak;
@@ -263,7 +294,8 @@
             document.getElementById('progress-bar').style.width = `${progress}%`;
             
             const status = document.getElementById('habit-status');
-            if (stats.totalDays >= 66) status.innerText = "Automaticity Zone";
+            if (stats.totalDays >= 90) status.innerText = "Habit Solidified";
+            else if (stats.totalDays >= 66) status.innerText = "Automaticity Zone";
             else if (stats.totalDays >= 30) status.innerText = "Momentum Building";
             else status.innerText = "Initiating Habit";
 
@@ -274,12 +306,11 @@
                     document.getElementById('form-container').classList.add('opacity-10', 'pointer-events-none');
                 }
             }
-            
             if (stats.gasUrl) document.getElementById('gas-url-input').value = stats.gasUrl;
             lucide.createIcons();
-        }
+        };
 
-        // Textarea Listeners
+        // Textarea Logic
         const tas = [document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3'), document.getElementById('p4'), document.getElementById('p5')];
         const limits = [20, 20, 20, 20, 250];
 
@@ -287,144 +318,106 @@
             ta.addEventListener('input', () => {
                 const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
                 document.getElementById(`wc-${i+1}`).innerText = `${words}/${limits[i]}`;
-                
-                if (words > limits[i]) {
-                    ta.classList.add('limit-exceeded');
-                    document.getElementById(`wc-${i+1}`).classList.add('text-red-500');
-                } else {
-                    ta.classList.remove('limit-exceeded');
-                    document.getElementById(`wc-${i+1}`).classList.remove('text-red-500');
-                }
-
+                ta.classList.toggle('limit-exceeded', words > limits[i]);
                 if (i === 4) {
-                    const p = Math.min((words / limits[i]) * 100, 100);
-                    document.getElementById('dump-progress').style.width = `${p}%`;
+                    document.getElementById('dump-progress').style.width = `${Math.min((words / limits[i]) * 100, 100)}%`;
                 }
-                checkForm();
+                const allValid = tas.every((t, idx) => {
+                    const w = t.value.trim() ? t.value.trim().split(/\s+/).length : 0;
+                    return w > 0 && w <= limits[idx];
+                });
+                const btn = document.getElementById('submit-btn');
+                btn.disabled = !allValid;
+                btn.className = allValid ? "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl active:scale-95 bg-blue-600 text-white shadow-blue-600/30" : "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl bg-white/5 text-gray-600 cursor-not-allowed";
             });
         });
 
-        function checkForm() {
-            const allValid = tas.every((ta, i) => {
-                const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
-                return words > 0 && words <= limits[i];
-            });
-            const btn = document.getElementById('submit-btn');
-            if (allValid) {
-                btn.disabled = false;
-                btn.className = "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl active:scale-95 bg-blue-600 text-white shadow-blue-600/30";
-            } else {
-                btn.disabled = true;
-                btn.className = "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl bg-white/5 text-gray-600 cursor-not-allowed";
-            }
-        }
-
-        // Global Actions
+        // Global functions
         window.toggleSettings = () => document.getElementById('settings-overlay').classList.toggle('hidden');
-
         window.saveGasUrl = async () => {
             const url = document.getElementById('gas-url-input').value.trim();
-            if (!url.includes('script.google.com')) return alert("Invalid Google Script URL.");
-            localStorage.setItem('logos_gas_url', url);
+            if (!url.includes('script.google.com')) return alert("Invalid URL.");
             stats.gasUrl = url;
-            if (currentUser) {
+            saveLocal();
+            if (currentUser && db) {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
                 await updateDoc(docRef, { gasUrl: url });
             }
             alert("Connection Updated.");
         };
-
         window.copySyncKey = () => {
-            if (!currentUser) return;
-            const text = currentUser.uid;
-            const el = document.createElement('textarea');
-            el.value = text;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            alert("Sync Key Copied!");
+            const text = currentUser ? currentUser.uid : "Offline Mode";
+            const el = document.createElement('textarea'); el.value = text;
+            document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+            alert("Key Copied!");
         };
-
+        window.simulateTomorrow = () => {
+            stats.lastEntry = "2000-01-01T00:00:00.000Z";
+            localStorage.setItem('test_mode', 'true');
+            saveLocal();
+            alert("Test mode active. Your next entry will count as a new day.");
+            location.reload();
+        };
         window.linkNewDevice = async () => {
-            const key = prompt("Paste the Sync Key from your other device:");
-            if (!key || !currentUser) return;
-            
+            const key = prompt("Paste your Sync Key:");
+            if (!key || !currentUser || !db) return;
             try {
-                const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', key);
-                const snap = await getDoc(targetRef);
+                const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userStats', key));
                 if (snap.exists()) {
-                    const cloudData = snap.data();
-                    const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
-                    await setDoc(myRef, cloudData);
-                    alert("Devices linked successfully!");
+                    stats = { ...stats, ...snap.data() };
+                    saveLocal();
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid), stats);
+                    alert("Synced!");
                 } else { alert("Key not found."); }
             } catch (e) { alert("Sync failed."); }
         };
-
         window.dismissSurprise = async () => {
-            if (!currentUser) return;
             stats.surpriseClaimed = true;
-            localStorage.setItem('logos_surprise_claimed', 'true');
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
-            await updateDoc(docRef, { surpriseClaimed: true });
+            saveLocal();
+            if (currentUser && db) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid), { surpriseClaimed: true });
             document.getElementById('surprise-modal').classList.add('hidden');
             document.getElementById('form-container').classList.remove('opacity-10', 'pointer-events-none');
         };
 
         document.getElementById('submit-btn').addEventListener('click', async () => {
             if (!stats.gasUrl) return toggleSettings();
-            
             const btn = document.getElementById('submit-btn');
-            btn.innerText = "TRANSMITTING...";
-            btn.disabled = true;
-
-            const payload = {
-                timestamp: new Date().toLocaleString(),
-                win: document.getElementById('p1').value,
-                friction: document.getElementById('p2').value,
-                pivot: document.getElementById('p3').value,
-                environment: document.getElementById('p4').value,
-                dump: document.getElementById('p5').value
-            };
-
+            btn.innerText = "TRANSMITTING..."; btn.disabled = true;
+            const payload = { timestamp: new Date().toLocaleString(), win: tas[0].value, friction: tas[1].value, pivot: tas[2].value, environment: tas[3].value, dump: tas[4].value };
             try {
                 await fetch(stats.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-
                 const now = new Date();
                 const last = stats.lastEntry ? new Date(stats.lastEntry) : null;
-                const isNewDay = !last || now.toDateString() !== last.toDateString();
-
-                if (isNewDay && currentUser) {
+                if (!last || now.toDateString() !== last.toDateString()) {
                     const diff = last ? Math.floor((now - last) / 86400000) : 0;
                     let gain = 10;
-                    let streak = (diff === 1) ? stats.streak + 1 : 1;
-                    if (streak % 7 === 0) gain += 50;
+                    stats.streak = (diff === 1) ? stats.streak + 1 : 1;
+                    if (stats.streak % 7 === 0) gain += 50;
                     if (diff === 2) gain = 20;
-
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
-                    await updateDoc(docRef, {
-                        totalDays: stats.totalDays + 1,
-                        streak: streak,
-                        coins: stats.coins + gain,
-                        lastEntry: now.toISOString()
-                    });
+                    stats.coins += gain;
+                    stats.totalDays += 1;
+                    stats.lastEntry = now.toISOString();
+                    localStorage.removeItem('test_mode');
+                    saveLocal();
+                    if (currentUser && db) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid), stats);
                 }
                 document.getElementById('form-container').classList.add('hidden');
                 document.getElementById('success-screen').classList.remove('hidden');
             } catch (e) {
-                alert("Transmission Error. Check your Script URL.");
-                btn.innerText = "COMPLETE ENTRY";
-                btn.disabled = false;
+                alert("Error. Check your Script URL.");
+                btn.innerText = "COMPLETE ENTRY"; btn.disabled = false;
             }
         });
 
         document.getElementById('shield-btn').addEventListener('click', async () => {
-            if (stats.coins < 100 || !currentUser) return;
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
-            await updateDoc(docRef, { coins: stats.coins - 100 });
-            alert("Shield deployed. Streak protected.");
+            if (stats.coins < 100) return;
+            stats.coins -= 100;
+            saveLocal();
+            if (currentUser && db) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid), { coins: stats.coins });
+            alert("Shield deployed.");
         });
+
+        updateUI();
     </script>
 </body>
 </html>
