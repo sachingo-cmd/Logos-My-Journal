@@ -1,448 +1,430 @@
-import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  onAuthStateChanged, 
-  signInWithCustomToken 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  onSnapshot, 
-  updateDoc, 
-  getDoc 
-} from 'firebase/firestore';
-import { 
-  BookOpen, 
-  Flame, 
-  Coins, 
-  Settings, 
-  Check, 
-  ShieldCheck, 
-  Star, 
-  Copy, 
-  RefreshCw,
-  X
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logos | Disciplined Journaling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e5e5; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .input-focus:focus { outline: none; border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+        .limit-exceeded { border-color: #ef4444 !important; color: #ef4444 !important; }
+        .progress-bar { transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .habit-marker { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #4b5563; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
-// --- FIREBASE INITIALIZATION ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'logos-journal-v1';
+    <!-- Sync Loading Overlay -->
+    <div id="sync-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center space-y-4 transition-opacity duration-700">
+        <div class="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-[10px] uppercase tracking-[0.3em] text-blue-500 font-bold">Connecting to Cloud Vault...</p>
+    </div>
 
-export default function App() {
-  // Authentication & Loading State
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  // App Stats State
-  const [stats, setStats] = useState({
-    coins: 0,
-    streak: 0,
-    totalDays: 0,
-    lastEntry: null,
-    gasUrl: localStorage.getItem('logos_gas_url') || '',
-    surpriseClaimed: localStorage.getItem('logos_surprise_claimed') === 'true'
-  });
-
-  // Form State
-  const [form, setForm] = useState({ p1: '', p2: '', p3: '', p4: '', p5: '' });
-  const limits = { p1: 20, p2: 20, p3: 20, p4: 20, p5: 250 };
-
-  // 1. RULE 3: Auth Before Queries
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (e) {
-        console.error("Auth failed", e);
-        setLoading(false);
-      }
-    };
-    initAuth();
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) return;
-
-      // 2. RULE 1: Strict Paths (artifacts/{appId}/public/data/userStats/{userId})
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', u.uid);
-      
-      const unsubscribeSnap = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const cloudData = docSnap.data();
-          setStats(prev => ({ ...prev, ...cloudData }));
-          // Sync some local preferences
-          if (cloudData.gasUrl) localStorage.setItem('logos_gas_url', cloudData.gasUrl);
-          if (cloudData.surpriseClaimed) localStorage.setItem('logos_surprise_claimed', 'true');
-        } else {
-          // Initialize new cloud user
-          setDoc(docRef, { 
-            coins: 0, 
-            streak: 0, 
-            totalDays: 0, 
-            lastEntry: null,
-            gasUrl: localStorage.getItem('logos_gas_url') || '',
-            surpriseClaimed: false
-          });
-        }
-        setLoading(false);
-      }, (err) => {
-        console.error("Firestore Error:", err);
-        setLoading(false);
-      });
-
-      return () => unsubscribeSnap();
-    });
-
-    return () => unsubscribeAuth();
-  }, []);
-
-  // Helpers
-  const getWordCount = (str) => str.trim() ? str.trim().split(/\s+/).length : 0;
-
-  const isFormValid = () => {
-    return Object.keys(form).every(key => {
-      const count = getWordCount(form[key]);
-      return count > 0 && count <= limits[key];
-    });
-  };
-
-  const handleInputChange = (p, val) => setForm({ ...form, [p]: val });
-
-  const saveConfig = (url) => {
-    if (!url.includes('script.google.com')) return alert("Invalid URL");
-    setStats(prev => ({ ...prev, gasUrl: url }));
-    localStorage.setItem('logos_gas_url', url);
-    if (user) {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-      updateDoc(docRef, { gasUrl: url }).catch(console.error);
-    }
-  };
-
-  const copySyncKey = () => {
-    if (user) {
-      const el = document.createElement('textarea');
-      el.value = user.uid;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      alert("Sync Key Copied!");
-    }
-  };
-
-  const linkDevice = async () => {
-    const key = prompt("Paste the Sync Key from your other device:");
-    if (!key || key.trim() === "" || !user) return;
-    
-    setIsSyncing(true);
-    try {
-      const targetDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', key);
-      const snap = await getDoc(targetDocRef);
-      if (snap.exists()) {
-        const cloudData = snap.data();
-        const myDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-        await setDoc(myDocRef, cloudData);
-        alert("Devices Linked! Your stats are now synced.");
-      } else {
-        alert("Invalid Key.");
-      }
-    } catch (e) {
-      alert("Sync failed.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!stats.gasUrl) return setShowSettings(true);
-    setIsSyncing(true);
-
-    const payload = {
-      timestamp: new Date().toLocaleString(),
-      win: form.p1,
-      friction: form.p2,
-      pivot: form.p3,
-      environment: form.p4,
-      dump: form.p5
-    };
-
-    try {
-      // Send to Google Doc
-      await fetch(stats.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-
-      // Reward Logic
-      const now = new Date();
-      const last = stats.lastEntry ? new Date(stats.lastEntry) : null;
-      const isNewDay = !last || now.toDateString() !== last.toDateString();
-
-      if (isNewDay && user) {
-        const diff = last ? Math.floor((now - last) / 86400000) : 0;
-        let newStreak = (diff === 1) ? stats.streak + 1 : 1;
-        let coinGain = 10;
-        if (newStreak % 7 === 0) coinGain += 50;
-        if (diff === 2) coinGain = 20; // Recovery bonus
-
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-        await updateDoc(docRef, {
-          totalDays: stats.totalDays + 1,
-          streak: newStreak,
-          coins: stats.coins + coinGain,
-          lastEntry: now.toISOString()
-        });
-      }
-      setSubmitted(true);
-      setForm({ p1: '', p2: '', p3: '', p4: '', p5: '' });
-    } catch (e) {
-      alert("Vault Connection Error.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const dismissSurprise = async () => {
-    if (!user) return;
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-    await updateDoc(docRef, { surpriseClaimed: true });
-    localStorage.setItem('logos_surprise_claimed', 'true');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center space-y-4">
-        <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] uppercase tracking-[0.3em] text-blue-500 font-bold">Connecting to Cloud Vault...</p>
-      </div>
-    );
-  }
-
-  const progress = Math.min((stats.totalDays / 90) * 100, 100);
-
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5] flex flex-col items-center p-4 md:p-8">
-      
-      {/* Header */}
-      <header className="w-full max-w-2xl flex justify-between items-center mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 ring-1 ring-blue-400/30">
-            <BookOpen className="text-white w-5 h-5" />
-          </div>
-          <h1 className="text-xl font-bold tracking-tighter uppercase italic selection:bg-blue-500">Logos</h1>
-        </div>
-        <div className="flex gap-3">
-          <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold border border-white/10 shadow-xl">
-            <Flame className="text-orange-500 w-4 h-4" /> <span>{stats.streak}</span>
-          </div>
-          <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold border border-white/10 shadow-xl">
-            <Coins className="text-yellow-500 w-4 h-4" /> <span>{stats.coins}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Progress Section */}
-      <section className="w-full max-w-2xl mb-12 px-1">
-        <div className="flex justify-between items-end mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
-          <span>{stats.totalDays >= 66 ? 'Automaticity Zone' : 'Initiating Habit'}</span>
-          <span className="text-blue-400">{stats.totalDays} / 90 Days</span>
-        </div>
-        <div className="relative h-2.5 bg-white/5 rounded-full overflow-visible">
-          <div className="absolute top-[-20px] left-[73.33%] translate-x-[-50%] text-[10px] font-bold text-gray-700">
-            <div className="mb-1">66</div>
-            <div className="h-4 w-0.5 bg-gray-800 mx-auto"></div>
-          </div>
-          <div 
-            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-700 to-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(37,99,235,0.3)]" 
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <p className="text-[9px] text-gray-600 mt-6 text-center italic tracking-widest">Habit automaticity typically peaks at day 66.</p>
-      </section>
-
-      <main className="w-full max-w-2xl flex-1 relative">
-        {/* Surprise Archivist Modal */}
-        {stats.coins >= 100 && !stats.surpriseClaimed && (
-          <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white/5 border border-yellow-500/30 p-8 rounded-[2.5rem] text-center space-y-6 animate-in zoom-in duration-500 max-w-xs shadow-2xl shadow-yellow-500/10">
-              <Star className="w-12 h-12 text-yellow-500 mx-auto fill-yellow-500/20" />
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-yellow-500 italic uppercase tracking-tighter">"The Archivist" Awakened</h2>
-                <p className="text-[10px] leading-relaxed text-gray-400 uppercase tracking-widest">100 Coins achieved. You have unlocked high-level pattern recognition.</p>
-              </div>
-              <button 
-                onClick={dismissSurprise}
-                className="w-full py-3 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-yellow-500 hover:text-black transition"
-              >
-                Claim Identity
-              </button>
+    <!-- Header -->
+    <header class="w-full max-w-2xl flex justify-between items-center mb-8">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 ring-1 ring-blue-400/30">
+                <i data-lucide="book-open" class="text-white w-5 h-5"></i>
             </div>
-          </div>
-        )}
+            <h1 class="text-xl font-bold tracking-tighter text-white uppercase italic">Logos</h1>
+        </div>
+        <div class="flex gap-3">
+            <div class="glass px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold border border-white/10 shadow-xl">
+                <i data-lucide="flame" class="text-orange-500 w-4 h-4"></i> <span id="streak-disp">0</span>
+            </div>
+            <div class="glass px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold border border-white/10 shadow-xl">
+                <i data-lucide="coins" class="text-yellow-500 w-4 h-4"></i> <span id="coin-disp">0</span>
+            </div>
+        </div>
+    </header>
 
-        {submitted ? (
-          <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-16 text-center space-y-6 animate-in fade-in zoom-in duration-500 shadow-2xl">
-            <div className="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto ring-1 ring-blue-500/30">
-              <Check className="w-10 h-10" />
+    <!-- Progress Section -->
+    <section class="w-full max-w-2xl mb-12 px-1">
+        <div class="flex justify-between items-end mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+            <span id="habit-status">Initiating Habit</span>
+            <span class="text-blue-400"><span id="days-disp">0</span> / 90 Days</span>
+        </div>
+        <div class="relative h-2.5 bg-white/5 rounded-full">
+            <div class="habit-marker" style="left: 73.33%;">
+                <div class="mb-1">66</div>
+                <div class="h-4 w-0.5 bg-gray-800 mx-auto"></div>
             </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold tracking-tighter italic uppercase">Vault Locked</h2>
-              <p className="text-xs text-gray-400 uppercase tracking-widest">Data transmitted to your Google Doc.</p>
-            </div>
-            <button 
-              onClick={() => setSubmitted(false)}
-              className="bg-white text-black px-12 py-3 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] hover:scale-105 transition active:scale-95 shadow-2xl"
-            >
-              Finish Session
-            </button>
-          </div>
-        ) : (
-          <div className={`space-y-8 transition-opacity duration-500 ${stats.coins >= 100 && !stats.surpriseClaimed ? 'opacity-10 pointer-events-none' : ''}`}>
-            {/* Grid of Prompts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { id: 'p1', label: '1. The Micro-Win', sub: 'What went right today?' },
-                { id: 'p2', label: '2. The Friction', sub: 'What felt heavy?' },
-                { id: 'p3', label: '3. The Pivot', sub: 'What would you change?' },
-                { id: 'p4', label: '4. Environment', sub: 'Sleep, food, or space?' }
-              ].map((item) => (
-                <div key={item.id} className="space-y-2">
-                  <div className="flex justify-between px-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">{item.label}</label>
-                    <span className={`text-[9px] font-mono ${getWordCount(form[item.id]) > limits[item.id] ? 'text-red-500' : 'text-gray-700'}`}>
-                      {getWordCount(form[item.id])}/{limits[item.id]}
-                    </span>
-                  </div>
-                  <textarea 
-                    value={form[item.id]}
-                    onChange={(e) => handleInputChange(item.id, e.target.value)}
-                    placeholder={item.sub}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all"
-                  />
+            <div id="progress-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-700 to-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(37,99,235,0.3)]" style="width: 0%"></div>
+        </div>
+        <p class="text-[9px] text-gray-600 mt-6 text-center italic tracking-widest uppercase">Habit automaticity typically peaks at day 66.</p>
+    </section>
+
+    <main class="w-full max-w-2xl flex-1 relative">
+        <!-- Surprise Archivist Modal -->
+        <div id="surprise-modal" class="hidden absolute inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white/5 border border-yellow-500/30 p-8 rounded-[2.5rem] text-center space-y-6 animate-fade-in max-w-xs shadow-2xl shadow-yellow-500/10">
+                <i data-lucide="star" class="w-12 h-12 text-yellow-500 mx-auto fill-yellow-500/20"></i>
+                <div class="space-y-2">
+                    <h2 class="text-xl font-bold text-yellow-500 italic uppercase tracking-tighter">"The Archivist" Awakened</h2>
+                    <p class="text-[10px] leading-relaxed text-gray-400 uppercase tracking-widest">100 Coins achieved. You have unlocked high-level pattern recognition.</p>
                 </div>
-              ))}
-            </div>
-
-            {/* Brain Dump */}
-            <div className="space-y-2">
-              <div className="flex justify-between px-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">5. Brain Dump (Catharsis)</label>
-                <span className={`text-[9px] font-mono ${getWordCount(form.p5) > limits.p5 ? 'text-red-500' : 'text-gray-700'}`}>
-                  {getWordCount(form.p5)}/{limits.p5}
-                </span>
-              </div>
-              <div className="relative">
-                <textarea 
-                  value={form.p5}
-                  onChange={(e) => handleInputChange('p5', e.target.value)}
-                  placeholder="Unfiltered thoughts. Be honest..."
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 min-h-[220px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all shadow-inner"
-                />
-                <div 
-                  className="absolute bottom-0 left-0 h-1 bg-blue-600 rounded-b-2xl transition-all duration-300 shadow-[0_0_10px_rgba(37,99,235,0.5)]" 
-                  style={{ width: `${Math.min((getWordCount(form.p5)/limits.p5)*100, 100)}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 flex flex-col items-center gap-6">
-              <button 
-                disabled={!isFormValid() || isSyncing}
-                onClick={handleSubmit}
-                className={`w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl active:scale-95 ${
-                  isFormValid() ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-white/5 text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin mx-auto" /> : 'Complete Entry'}
-              </button>
-
-              {stats.coins >= 100 && (
-                <button 
-                  onClick={() => {
-                    if (stats.coins < 100) return;
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
-                    updateDoc(docRef, { coins: stats.coins - 100 }).then(() => alert("Shield Activated. Streak protected.")).catch(console.error);
-                  }}
-                  className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 hover:text-blue-400 transition"
-                >
-                  <ShieldCheck className="w-4 h-4 text-blue-500" /> Activate Shield (100 Coins)
+                <button onclick="dismissSurprise()" class="w-full py-3 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-yellow-500 hover:text-black transition">
+                    Claim Identity
                 </button>
-              )}
             </div>
-          </div>
-        )}
-      </main>
+        </div>
 
-      {/* Settings UI */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-[#111] border border-white/10 max-w-sm w-full p-8 rounded-[2.5rem] space-y-8 shadow-2xl relative">
-            <button 
-              onClick={() => setShowSettings(false)} 
-              className="absolute top-6 right-6 text-gray-600 hover:text-white transition"
-            >
-              <X className="w-5 h-5"/>
+        <!-- Journal Form -->
+        <div id="form-container" class="space-y-8 animate-fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Prompts 1-4 -->
+                <div class="space-y-2">
+                    <div class="flex justify-between px-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">1. Micro-Win</label>
+                        <span id="wc-1" class="text-[9px] font-mono text-gray-700">0/20</span>
+                    </div>
+                    <textarea id="p1" data-limit="20" placeholder="What went right today?" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all"></textarea>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between px-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">2. Friction</label>
+                        <span id="wc-2" class="text-[9px] font-mono text-gray-700">0/20</span>
+                    </div>
+                    <textarea id="p2" data-limit="20" placeholder="What felt heavy?" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all"></textarea>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between px-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">3. Pivot</label>
+                        <span id="wc-3" class="text-[9px] font-mono text-gray-700">0/20</span>
+                    </div>
+                    <textarea id="p3" data-limit="20" placeholder="What would you change?" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all"></textarea>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between px-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">4. Environment</label>
+                        <span id="wc-4" class="text-[9px] font-mono text-gray-700">0/20</span>
+                    </div>
+                    <textarea id="p4" data-limit="20" placeholder="Sleep, food, or space?" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all"></textarea>
+                </div>
+            </div>
+
+            <!-- Brain Dump -->
+            <div class="space-y-2">
+                <div class="flex justify-between px-1">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">5. Brain Dump (Catharsis)</label>
+                    <span id="wc-5" class="text-[9px] font-mono text-gray-700">0/250</span>
+                </div>
+                <div class="relative">
+                    <textarea id="p5" data-limit="250" placeholder="Unfiltered thoughts. Be honest..." class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 min-h-[220px] resize-none focus:outline-none focus:border-blue-500 focus:bg-blue-500/5 text-sm transition-all shadow-inner"></textarea>
+                    <div id="dump-progress" class="absolute bottom-0 left-0 h-1 bg-blue-600 rounded-b-2xl transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex flex-col items-center gap-6">
+                <button id="submit-btn" disabled class="w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl active:scale-95 bg-white/5 text-gray-600 cursor-not-allowed">
+                    Complete Entry
+                </button>
+                <button id="shield-btn" class="hidden flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 hover:text-blue-400 transition">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-blue-500"></i> Activate Shield (100 Coins)
+                </button>
+            </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div id="success-screen" class="hidden bg-white/5 border border-white/10 rounded-[2.5rem] p-16 text-center space-y-6 animate-fade-in shadow-2xl">
+            <div class="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto ring-1 ring-blue-500/30">
+                <i data-lucide="check" class="w-10 h-10"></i>
+            </div>
+            <div class="space-y-2">
+                <h2 class="text-2xl font-bold tracking-tighter italic uppercase">Vault Locked</h2>
+                <p class="text-xs text-gray-400 uppercase tracking-widest">Cloud synchronization complete.</p>
+            </div>
+            <button onclick="location.reload()" class="bg-white text-black px-12 py-3 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] hover:scale-105 transition active:scale-95 shadow-2xl">
+                Finish Session
+            </button>
+        </div>
+    </main>
+
+    <!-- Settings Overlay -->
+    <div id="settings-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
+        <div class="bg-[#111] border border-white/10 max-w-sm w-full p-8 rounded-[2.5rem] space-y-8 shadow-2xl relative">
+            <button onclick="toggleSettings()" class="absolute top-6 right-6 text-gray-600 hover:text-white transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
             
-            <div className="space-y-6">
-              <h2 className="text-blue-400 font-bold uppercase tracking-[0.2em] text-[10px]">Cloud Connection</h2>
-              
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Google Script URL</label>
-                <input 
-                  type="text" 
-                  value={stats.gasUrl}
-                  onChange={(e) => saveConfig(e.target.value)}
-                  placeholder="https://script.google.com/..."
-                  className="w-full bg-black/60 border border-white/10 rounded-xl p-4 text-xs outline-none focus:border-blue-500 transition-all font-mono"
-                />
-              </div>
-
-              <div className="pt-6 border-t border-white/5 space-y-3">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Device Sync Key</label>
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-black/40 border border-white/5 rounded-xl p-4 text-[10px] font-mono text-blue-400 truncate">
-                    {user?.uid || 'Authenticating...'}
-                  </div>
-                  <button onClick={copySyncKey} className="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition border border-white/5">
-                    <Copy className="w-4 h-4"/>
-                  </button>
+            <div class="space-y-6">
+                <h2 class="text-blue-400 font-bold uppercase tracking-[0.2em] text-[10px]">Cloud Configuration</h2>
+                
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Google Script URL</label>
+                    <input type="text" id="gas-url-input" placeholder="https://script.google.com/..." class="w-full bg-black/60 border border-white/10 rounded-xl p-4 text-xs outline-none focus:border-blue-500 transition-all font-mono">
+                    <button onclick="saveGasUrl()" class="w-full py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest mt-2">Update URL</button>
                 </div>
-                <p className="text-[9px] text-gray-600 leading-relaxed italic uppercase tracking-tighter">
-                  Link your phone by pasting this key on it.
-                </p>
-              </div>
 
-              <button 
-                onClick={linkDevice}
-                className="w-full py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition shadow-lg"
-              >
-                Link External Device
-              </button>
+                <div class="pt-6 border-t border-white/5 space-y-3">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Device Sync Key</label>
+                    <div class="flex gap-2">
+                        <div id="user-id-display" class="flex-1 bg-black/40 border border-white/5 rounded-xl p-4 text-[10px] font-mono text-blue-400 truncate">
+                            Authenticating...
+                        </div>
+                        <button onclick="copySyncKey()" class="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition border border-white/5">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <p class="text-[9px] text-gray-600 leading-relaxed italic uppercase tracking-tighter">
+                        Link other devices by pasting this key there.
+                    </p>
+                </div>
+
+                <button onclick="linkNewDevice()" class="w-full py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition shadow-lg">
+                    Link External Device
+                </button>
             </div>
-          </div>
         </div>
-      )}
-
-      <footer className="py-12 w-full flex justify-center border-t border-white/5 mt-10">
-        <button 
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-3 text-[9px] font-bold uppercase tracking-[0.4em] text-gray-700 hover:text-blue-500 transition-all group"
-        >
-          <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-700" />
-          System Settings
-        </button>
-      </footer>
     </div>
-  );
-}
+
+    <footer class="py-12 w-full flex justify-center border-t border-white/5 mt-10">
+        <button onclick="toggleSettings()" class="flex items-center gap-3 text-[9px] font-bold uppercase tracking-[0.4em] text-gray-700 hover:text-blue-500 transition-all group">
+            <i data-lucide="settings" class="w-4 h-4 group-hover:rotate-90 transition-transform duration-700"></i>
+            System Settings
+        </button>
+    </footer>
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'logos-journal-v1';
+
+        // App State
+        let currentUser = null;
+        let stats = {
+            coins: 0,
+            streak: 0,
+            totalDays: 0,
+            lastEntry: null,
+            gasUrl: localStorage.getItem('logos_gas_url') || '',
+            surpriseClaimed: localStorage.getItem('logos_surprise_claimed') === 'true'
+        };
+
+        // Initialize UI
+        lucide.createIcons();
+
+        // RULE 3: Auth first
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) return;
+            currentUser = user;
+            document.getElementById('user-id-display').innerText = user.uid;
+            
+            // RULE 1: Strict Paths
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', user.uid);
+            
+            onSnapshot(docRef, (snap) => {
+                if (snap.exists()) {
+                    stats = { ...stats, ...snap.data() };
+                    updateUI();
+                } else {
+                    // Init user if not found
+                    setDoc(docRef, { coins: 0, streak: 0, totalDays: 0, lastEntry: null, gasUrl: stats.gasUrl, surpriseClaimed: false });
+                }
+                document.getElementById('sync-overlay').classList.add('opacity-0', 'pointer-events-none');
+            });
+        });
+
+        initAuth();
+
+        // UI Logic
+        window.updateUI = function() {
+            document.getElementById('coin-disp').innerText = stats.coins;
+            document.getElementById('streak-disp').innerText = stats.streak;
+            document.getElementById('days-disp').innerText = stats.totalDays;
+            
+            const progress = Math.min((stats.totalDays / 90) * 100, 100);
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+            
+            const status = document.getElementById('habit-status');
+            if (stats.totalDays >= 66) status.innerText = "Automaticity Zone";
+            else if (stats.totalDays >= 30) status.innerText = "Momentum Building";
+            else status.innerText = "Initiating Habit";
+
+            if (stats.coins >= 100) {
+                document.getElementById('shield-btn').classList.remove('hidden');
+                if (!stats.surpriseClaimed) {
+                    document.getElementById('surprise-modal').classList.remove('hidden');
+                    document.getElementById('form-container').classList.add('opacity-10', 'pointer-events-none');
+                }
+            }
+            
+            if (stats.gasUrl) document.getElementById('gas-url-input').value = stats.gasUrl;
+            lucide.createIcons();
+        }
+
+        // Textarea Listeners
+        const tas = [document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3'), document.getElementById('p4'), document.getElementById('p5')];
+        const limits = [20, 20, 20, 20, 250];
+
+        tas.forEach((ta, i) => {
+            ta.addEventListener('input', () => {
+                const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+                document.getElementById(`wc-${i+1}`).innerText = `${words}/${limits[i]}`;
+                
+                if (words > limits[i]) {
+                    ta.classList.add('limit-exceeded');
+                    document.getElementById(`wc-${i+1}`).classList.add('text-red-500');
+                } else {
+                    ta.classList.remove('limit-exceeded');
+                    document.getElementById(`wc-${i+1}`).classList.remove('text-red-500');
+                }
+
+                if (i === 4) {
+                    const p = Math.min((words / limits[i]) * 100, 100);
+                    document.getElementById('dump-progress').style.width = `${p}%`;
+                }
+                checkForm();
+            });
+        });
+
+        function checkForm() {
+            const allValid = tas.every((ta, i) => {
+                const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+                return words > 0 && words <= limits[i];
+            });
+            const btn = document.getElementById('submit-btn');
+            if (allValid) {
+                btn.disabled = false;
+                btn.className = "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl active:scale-95 bg-blue-600 text-white shadow-blue-600/30";
+            } else {
+                btn.disabled = true;
+                btn.className = "w-full py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-2xl bg-white/5 text-gray-600 cursor-not-allowed";
+            }
+        }
+
+        // Global Actions
+        window.toggleSettings = () => document.getElementById('settings-overlay').classList.toggle('hidden');
+
+        window.saveGasUrl = async () => {
+            const url = document.getElementById('gas-url-input').value.trim();
+            if (!url.includes('script.google.com')) return alert("Invalid Google Script URL.");
+            localStorage.setItem('logos_gas_url', url);
+            stats.gasUrl = url;
+            if (currentUser) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
+                await updateDoc(docRef, { gasUrl: url });
+            }
+            alert("Connection Updated.");
+        };
+
+        window.copySyncKey = () => {
+            if (!currentUser) return;
+            const text = currentUser.uid;
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("Sync Key Copied!");
+        };
+
+        window.linkNewDevice = async () => {
+            const key = prompt("Paste the Sync Key from your other device:");
+            if (!key || !currentUser) return;
+            
+            try {
+                const targetRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', key);
+                const snap = await getDoc(targetRef);
+                if (snap.exists()) {
+                    const cloudData = snap.data();
+                    const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
+                    await setDoc(myRef, cloudData);
+                    alert("Devices linked successfully!");
+                } else { alert("Key not found."); }
+            } catch (e) { alert("Sync failed."); }
+        };
+
+        window.dismissSurprise = async () => {
+            if (!currentUser) return;
+            stats.surpriseClaimed = true;
+            localStorage.setItem('logos_surprise_claimed', 'true');
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
+            await updateDoc(docRef, { surpriseClaimed: true });
+            document.getElementById('surprise-modal').classList.add('hidden');
+            document.getElementById('form-container').classList.remove('opacity-10', 'pointer-events-none');
+        };
+
+        document.getElementById('submit-btn').addEventListener('click', async () => {
+            if (!stats.gasUrl) return toggleSettings();
+            
+            const btn = document.getElementById('submit-btn');
+            btn.innerText = "TRANSMITTING...";
+            btn.disabled = true;
+
+            const payload = {
+                timestamp: new Date().toLocaleString(),
+                win: document.getElementById('p1').value,
+                friction: document.getElementById('p2').value,
+                pivot: document.getElementById('p3').value,
+                environment: document.getElementById('p4').value,
+                dump: document.getElementById('p5').value
+            };
+
+            try {
+                await fetch(stats.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+
+                const now = new Date();
+                const last = stats.lastEntry ? new Date(stats.lastEntry) : null;
+                const isNewDay = !last || now.toDateString() !== last.toDateString();
+
+                if (isNewDay && currentUser) {
+                    const diff = last ? Math.floor((now - last) / 86400000) : 0;
+                    let gain = 10;
+                    let streak = (diff === 1) ? stats.streak + 1 : 1;
+                    if (streak % 7 === 0) gain += 50;
+                    if (diff === 2) gain = 20;
+
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
+                    await updateDoc(docRef, {
+                        totalDays: stats.totalDays + 1,
+                        streak: streak,
+                        coins: stats.coins + gain,
+                        lastEntry: now.toISOString()
+                    });
+                }
+                document.getElementById('form-container').classList.add('hidden');
+                document.getElementById('success-screen').classList.remove('hidden');
+            } catch (e) {
+                alert("Transmission Error. Check your Script URL.");
+                btn.innerText = "COMPLETE ENTRY";
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('shield-btn').addEventListener('click', async () => {
+            if (stats.coins < 100 || !currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'userStats', currentUser.uid);
+            await updateDoc(docRef, { coins: stats.coins - 100 });
+            alert("Shield deployed. Streak protected.");
+        });
+    </script>
+</body>
+</html>
