@@ -220,7 +220,7 @@
 
 <script>
   // ── CONFIG ──────────────────────────────────────────────────────────────────
-  const SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbynw47G3lkqvH2pEsYRlfuTlvLuJDOHxOtENZMZvtvEXsQq6mVBcjl2y_fG0zLDDlCD/exec';
   const DRAFT_KEY  = 'tlb_draft';
   const STATS_KEY  = 'tlb_stats';
 
@@ -329,8 +329,8 @@
     const btn  = document.getElementById('btnNext');
     const last = step === FIELDS.length-1;
     let cls, hint;
-    if (wc < f.min)      { cls='under'; hint=`Need ${f.min-wc} more word${f.min-wc===1?'':\'s'}`; }
-    else if (wc > f.max) { cls='over';  hint=`${wc-f.max} word${wc-f.max===1?'':\'s'} over limit`; }
+    if (wc < f.min)      { cls='under'; hint=`Need ${f.min-wc} more word${f.min-wc===1?"":"s"}`; }
+    else if (wc > f.max) { cls='over';  hint=`${wc-f.max} word${wc-f.max===1?"":"s"} over limit`; }
     else                 { cls='valid'; hint='\u2713 Good to go'; }
     cEl.textContent = wc+' words'; cEl.className = 'wc-count '+cls;
     hEl.textContent = hint;         hEl.className = 'wc-hint '+cls;
