@@ -6,14 +6,11 @@
   <title>The Logos Bridge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-
   <style>
-    /* ── TOKENS ─────────────────────────────────────────────── */
     :root {
       --bg:          #080e1a;
       --surface:     #0f172a;
       --surface2:    #1e293b;
-      --border:      #1e293b;
       --border-lit:  #334155;
       --blue:        #2563eb;
       --blue-soft:   #3b82f6;
@@ -21,6 +18,7 @@
       --purple:      #7c3aed;
       --purple-glow: rgba(124,58,237,.16);
       --green:       #10b981;
+      --orange:      #f59e0b;
       --red:         #ef4444;
       --text:        #f1f5f9;
       --muted:       #94a3b8;
@@ -28,564 +26,377 @@
       --r:           14px;
       --r-sm:        8px;
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background: var(--bg);
       color: var(--text);
       font-family: 'Inter', sans-serif;
       min-height: 100vh;
-      line-height: 1.6;
     }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 28px 20px 100px; }
 
-    /* ── LAYOUT ─────────────────────────────────────────────── */
-    .wrap {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 28px 20px 100px;
-    }
-
-    /* ── HEADER ─────────────────────────────────────────────── */
+    /* ── HEADER ── */
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 28px;
-      padding-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 28px; padding-bottom: 20px;
       border-bottom: 1px solid var(--border-lit);
     }
-
     .logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--blue-soft);
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--blue-soft);
     }
-
     .logo span { color: var(--dim); font-weight: 400; }
+    .current-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
 
-    .current-date {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--dim);
-    }
-
-    /* ── STATS ──────────────────────────────────────────────── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-
+    /* ── STATS ── */
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 24px; }
     .stat {
-      background: var(--surface);
-      border: 1px solid var(--border-lit);
-      border-radius: var(--r);
-      padding: 14px 12px;
-      text-align: center;
-      transition: border-color .2s;
+      background: var(--surface); border: 1px solid var(--border-lit);
+      border-radius: var(--r); padding: 14px 12px; text-align: center; transition: border-color .2s;
     }
-
     .stat:hover { border-color: var(--blue); }
-
     .stat-val {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 26px;
-      font-weight: 700;
-      color: var(--blue-soft);
-      line-height: 1;
+      font-family: 'JetBrains Mono', monospace; font-size: 26px;
+      font-weight: 700; color: var(--blue-soft); line-height: 1;
     }
+    .stat-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; margin-top: 5px; }
 
-    .stat-val.fire { color: #fb923c; }
-
-    .stat-lbl {
-      font-size: 10px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .09em;
-      margin-top: 5px;
+    /* ── TOOLTIP ── */
+    .tip { position: relative; cursor: help; color: var(--dim); font-size: 11px; margin-left: 3px; }
+    .tip::after {
+      content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border-lit);
+      color: var(--muted); padding: 8px 11px; border-radius: 8px; font-size: 11px; width: 190px;
+      text-align: center; line-height: 1.55; white-space: normal; pointer-events: none;
+      opacity: 0; transition: opacity .18s; z-index: 50; font-weight: 400; letter-spacing: 0; text-transform: none;
     }
-
-    /* ── PROGRESS ───────────────────────────────────────────── */
-    .prog-wrap { margin-bottom: 20px; }
-
-    .prog-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--dim);
-      margin-bottom: 7px;
-      font-family: 'JetBrains Mono', monospace;
+    .tip::before {
+      content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%;
+      transform: translateX(-50%); border: 5px solid transparent;
+      border-top-color: var(--border-lit); opacity: 0; transition: opacity .18s; z-index: 51; pointer-events: none;
     }
+    .tip:hover::after, .tip:hover::before { opacity: 1; }
 
-    .prog-track {
-      height: 3px;
-      background: var(--surface2);
-      border-radius: 999px;
-      overflow: hidden;
+    /* ── STEP DOTS ── */
+    .steps { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; }
+    .step-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--surface2);
+      border: 1px solid var(--border-lit); transition: all .3s ease; cursor: default;
     }
+    .step-dot.done  { background: var(--green); border-color: var(--green); }
+    .step-dot.active { background: var(--blue-soft); border-color: var(--blue-soft); width: 24px; border-radius: 4px; }
 
-    .prog-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--blue), var(--blue-soft));
-      border-radius: 999px;
-      transition: width .4s cubic-bezier(.4, 0, .2, 1);
-    }
-
-    /* ── DRAFT BADGE ─────────────────────────────────────────── */
+    /* ── DRAFT BADGE ── */
     .draft-badge {
-      height: 18px;
-      text-align: right;
-      font-size: 11px;
-      color: var(--dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-bottom: 10px;
-      transition: opacity .3s;
+      height: 18px; text-align: right; font-size: 11px; color: var(--dim);
+      font-family: 'JetBrains Mono', monospace; margin-bottom: 12px;
     }
 
-    /* ── CARDS ──────────────────────────────────────────────── */
+    /* ── CARD ── */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border-lit);
-      border-radius: var(--r);
-      padding: 20px;
-      margin-bottom: 12px;
-      transition: border-color .2s, box-shadow .2s;
+      background: var(--surface); border: 1px solid var(--border-lit);
+      border-radius: var(--r); padding: 24px; transition: border-color .2s, box-shadow .2s;
     }
-
-    .card:focus-within {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px var(--blue-glow);
-    }
-
-    .card.dump:focus-within {
-      border-color: var(--purple);
-      box-shadow: 0 0 0 3px var(--purple-glow);
-    }
-
+    .card:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
+    .card.dump:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px var(--purple-glow); }
     .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-
     .tag {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 5px;
-      border: 1px solid rgba(37,99,235,.3);
-      background: var(--blue-glow);
-      color: var(--blue-soft);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+      padding: 3px 8px; border-radius: 5px;
+      border: 1px solid rgba(37,99,235,.3); background: var(--blue-glow); color: var(--blue-soft);
     }
+    .card.dump .tag { border-color: rgba(124,58,237,.3); background: var(--purple-glow); color: #a78bfa; }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; }
+    .card-question { font-size: 14px; color: var(--muted); font-style: italic; margin-bottom: 16px; line-height: 1.5; }
 
-    .card.dump .tag {
-      border-color: rgba(124,58,237,.3);
-      background: var(--purple-glow);
-      color: #a78bfa;
-    }
-
-    .card-title {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .09em;
-    }
-
-    .card-question {
-      font-size: 13px;
-      color: var(--muted);
-      font-style: italic;
-      margin-bottom: 12px;
-    }
-
-    /* ── INPUTS ─────────────────────────────────────────────── */
+    /* ── TEXTAREA ── */
     textarea {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border-lit);
-      border-radius: var(--r-sm);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      line-height: 1.65;
-      padding: 12px 14px;
-      resize: vertical;
-      outline: none;
-      transition: border-color .2s;
-      min-height: 88px;
+      width: 100%; background: var(--surface2); border: 1px solid var(--border-lit);
+      border-radius: var(--r-sm); color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 14px; line-height: 1.65; padding: 12px 14px; resize: vertical;
+      outline: none; transition: border-color .2s; min-height: 110px;
     }
-
     textarea:focus { border-color: var(--blue-soft); }
-
-    .card.dump textarea { min-height: 140px; }
-
+    .card.dump textarea { min-height: 180px; }
     textarea::placeholder { color: var(--dim); }
 
-    .char-line {
-      text-align: right;
-      font-size: 11px;
-      color: var(--dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-top: 6px;
+    /* ── WORD COUNTER ── */
+    .wc-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
     }
+    .wc-range { color: var(--dim); }
+    .wc-right { display: flex; gap: 12px; align-items: center; }
+    .wc-count { font-weight: 600; }
+    .wc-hint  { }
+    .under { color: var(--orange); }
+    .valid  { color: var(--green);  }
+    .over   { color: var(--red);    }
 
-    /* ── SUBMIT ─────────────────────────────────────────────── */
-    .submit-area { margin-top: 20px; }
-
-    .btn-submit {
-      width: 100%;
-      padding: 15px;
-      background: var(--blue);
-      color: #fff;
-      border: none;
-      border-radius: var(--r);
-      font-family: 'Inter', sans-serif;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      letter-spacing: .02em;
-      transition: background .2s, box-shadow .2s, transform .1s;
+    /* ── NAVIGATION ── */
+    .nav { display: flex; gap: 12px; margin-top: 20px; }
+    .btn-back {
+      padding: 13px 20px; background: transparent; color: var(--muted);
+      border: 1px solid var(--border-lit); border-radius: var(--r);
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: all .2s; white-space: nowrap;
     }
-
-    .btn-submit:hover:not(:disabled) {
-      background: var(--blue-soft);
-      box-shadow: 0 0 28px rgba(59,130,246,.4);
+    .btn-back:hover { border-color: var(--blue-soft); color: var(--text); }
+    .btn-next {
+      flex: 1; padding: 13px; background: var(--blue); color: #fff; border: none;
+      border-radius: var(--r); font-family: 'Inter', sans-serif; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: background .2s, box-shadow .2s, opacity .2s;
     }
+    .btn-next:hover:not(:disabled) { background: var(--blue-soft); box-shadow: 0 0 24px rgba(59,130,246,.4); }
+    .btn-next:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-next.submit { background: var(--green); }
+    .btn-next.submit:hover:not(:disabled) { background: #059669; box-shadow: 0 0 24px rgba(16,185,129,.35); }
 
-    .btn-submit:active:not(:disabled) { transform: scale(.99); }
+    /* ── SLIDE ANIMATIONS ── */
+    @keyframes slideInRight { from { transform: translateX(36px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideInLeft  { from { transform: translateX(-36px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .slide-in-right { animation: slideInRight .28s ease forwards; }
+    .slide-in-left  { animation: slideInLeft  .28s ease forwards; }
 
-    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+    /* ── HINT ── */
+    .hint { text-align: center; font-size: 12px; color: var(--dim); font-family: 'JetBrains Mono', monospace; margin-top: 10px; }
+    kbd { background: var(--surface2); border: 1px solid var(--border-lit); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
 
-    .hint {
-      text-align: center;
-      font-size: 12px;
-      color: var(--dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-top: 10px;
-    }
-
-    kbd {
-      background: var(--surface2);
-      border: 1px solid var(--border-lit);
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-size: 11px;
-    }
-
-    /* ── TOAST ──────────────────────────────────────────────── */
+    /* ── TOAST ── */
     .toast {
-      position: fixed;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      padding: 12px 24px;
-      border-radius: 999px;
-      font-weight: 600;
-      font-size: 13px;
-      white-space: nowrap;
-      background: var(--green);
-      color: #fff;
-      z-index: 999;
-      transition: transform .35s cubic-bezier(.34,1.56,.64,1);
-      pointer-events: none;
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+      padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 13px;
+      white-space: nowrap; background: var(--green); color: #fff; z-index: 999;
+      transition: transform .35s cubic-bezier(.34,1.56,.64,1); pointer-events: none;
     }
-
     .toast.show { transform: translateX(-50%) translateY(0); }
     .toast.err  { background: var(--red); }
 
-    /* ── FIRE FLICKER ────────────────────────────────────────── */
-    @keyframes flicker {
-      0%,100% { transform: scale(1) rotate(-2deg); }
-      50%      { transform: scale(1.12) rotate(2deg); }
-    }
-
+    /* ── FIRE ── */
+    @keyframes flicker { 0%,100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.12) rotate(2deg); } }
     .fire { display: inline-block; animation: flicker 1.8s ease-in-out infinite; }
 
-    /* ── RESPONSIVE ─────────────────────────────────────────── */
     @media (max-width: 480px) {
       .stat-val { font-size: 20px; }
-      .header   { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 4px; }
     }
   </style>
 </head>
-
 <body>
 <div class="wrap">
 
-  <!-- Header -->
   <header class="header">
     <div class="logo">The Logos Bridge <span>/ Daily Log</span></div>
     <div class="current-date" id="dateEl"></div>
   </header>
 
-  <!-- Stats -->
   <div class="stats">
     <div class="stat">
-      <div class="stat-val fire" id="statStreak">0</div>
-      <div class="stat-lbl"><span class="fire">🔥</span> Streak</div>
+      <div class="stat-val" id="statStreak">0</div>
+      <div class="stat-lbl"><span class="fire">&#x1F525;</span> Streak <span class="tip" data-tip="Consecutive days journaled. Resets if you skip a day.">&#9432;</span></div>
     </div>
     <div class="stat">
       <div class="stat-val" id="statTotal">0</div>
-      <div class="stat-lbl">📓 Total</div>
+      <div class="stat-lbl">&#x1F4D3; Total <span class="tip" data-tip="All entries you have ever submitted across all time.">&#9432;</span></div>
     </div>
     <div class="stat">
       <div class="stat-val" id="statWeek">0</div>
-      <div class="stat-lbl">📅 This Week</div>
+      <div class="stat-lbl">&#x1F4C5; This Week <span class="tip" data-tip="Days journaled since Monday this week.">&#9432;</span></div>
     </div>
   </div>
 
-  <!-- Progress -->
-  <div class="prog-wrap">
-    <div class="prog-meta">
-      <span>Entry progress</span>
-      <span id="progText">0 / 5 fields</span>
-    </div>
-    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-  </div>
-
-  <!-- Draft indicator -->
+  <div class="steps" id="stepDots"></div>
   <div class="draft-badge" id="draftBadge"></div>
+  <div id="cardStage"></div>
 
-  <!-- Form -->
-  <form id="form" novalidate>
-
-    <div class="card" data-f="win">
-      <div class="card-header">
-        <span class="tag">01</span>
-        <span class="card-title">The Micro-Win</span>
-      </div>
-      <p class="card-question">One thing that went right today?</p>
-      <textarea id="win" placeholder="Even small wins count…"></textarea>
-    </div>
-
-    <div class="card" data-f="friction">
-      <div class="card-header">
-        <span class="tag">02</span>
-        <span class="card-title">The Friction</span>
-      </div>
-      <p class="card-question">What felt heavy or off?</p>
-      <textarea id="friction" placeholder="Be honest. No judgment here…"></textarea>
-    </div>
-
-    <div class="card" data-f="pivot">
-      <div class="card-header">
-        <span class="tag">03</span>
-        <span class="card-title">The Pivot</span>
-      </div>
-      <p class="card-question">One thing you'd do differently?</p>
-      <textarea id="pivot" placeholder="What's the course correction?…"></textarea>
-    </div>
-
-    <div class="card" data-f="environment">
-      <div class="card-header">
-        <span class="tag">04</span>
-        <span class="card-title">Environmental Data</span>
-      </div>
-      <p class="card-question">Did sleep, food, or space affect you today?</p>
-      <textarea id="environment" placeholder="Track your inputs…"></textarea>
-    </div>
-
-    <div class="card dump" data-f="dump">
-      <div class="card-header">
-        <span class="tag">05</span>
-        <span class="card-title">Unfiltered Brain Dump</span>
-      </div>
-      <p class="card-question">Stream of consciousness — no filter, no rules.</p>
-      <textarea id="dump" placeholder="…"></textarea>
-      <div class="char-line"><span id="charCount">0</span> chars</div>
-    </div>
-
-    <div class="submit-area">
-      <button type="submit" class="btn-submit" id="submitBtn">✦ Log Today's Entry</button>
-      <p class="hint">or press <kbd>Ctrl</kbd> + <kbd>Enter</kbd></p>
-    </div>
-
-  </form>
+  <div class="nav" id="nav">
+    <button class="btn-back" id="btnBack" style="display:none">&#8592; Back</button>
+    <button class="btn-next" id="btnNext" disabled>Continue &#8594;</button>
+  </div>
+  <p class="hint">or press <kbd>Ctrl</kbd> + <kbd>&rarr;</kbd> &nbsp;/&nbsp; <kbd>Ctrl</kbd> + <kbd>&larr;</kbd></p>
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-  // ── CONFIG ─────────────────────────────────────────────────────────────────
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbynw47G3lkqvH2pEsYRlfuTlvLuJDOHxOtENZMZvtvEXsQq6mVBcjl2y_fG0zLDDlCD/exec';
-  const FIELDS     = ['win', 'friction', 'pivot', 'environment', 'dump'];
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
+  const SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   const DRAFT_KEY  = 'tlb_draft';
   const STATS_KEY  = 'tlb_stats';
 
-  // ── BOOT ───────────────────────────────────────────────────────────────────
-  setDate();
-  renderStats();
-  restoreDraft();
-  bindEvents();
+  const FIELDS = [
+    { id:'win',         num:'01', title:'The Micro-Win',      question:'One thing that went right today?',            min:12, max:30  },
+    { id:'friction',    num:'02', title:'The Friction',        question:'What felt heavy or off?',                     min:12, max:50  },
+    { id:'pivot',       num:'03', title:'The Pivot',           question:'One thing you\'d do differently?',             min:12, max:40  },
+    { id:'environment', num:'04', title:'Environmental Data',  question:'Did sleep, food, or space affect you today?', min:12, max:40  },
+    { id:'dump',        num:'05', title:'Brain Dump',          question:'Stream of consciousness \u2014 no filter, no rules.', min:80, max:300, isDump:true },
+  ];
 
-  // ── DATE ───────────────────────────────────────────────────────────────────
+  // ── STATE ────────────────────────────────────────────────────────────────────
+  let step = 0, answers = {}, draftTimer;
+
+  // ── BOOT ─────────────────────────────────────────────────────────────────────
+  setDate(); renderStats(); loadDraft(); buildDots(); renderStep(step, 'right'); bindNav();
+
+  // ── DATE ─────────────────────────────────────────────────────────────────────
   function setDate() {
     document.getElementById('dateEl').textContent =
-      new Date().toLocaleDateString('en-IN', {
-        weekday:'long', day:'numeric', month:'long', year:'numeric'
-      });
+      new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   }
 
-  // ── STATS ──────────────────────────────────────────────────────────────────
+  // ── STATS ────────────────────────────────────────────────────────────────────
   function getStats() {
-    return JSON.parse(localStorage.getItem(STATS_KEY) ||
-      '{"total":0,"streak":0,"lastDate":null,"weekDates":[]}');
+    return JSON.parse(localStorage.getItem(STATS_KEY) || '{"total":0,"streak":0,"lastDate":null,"weekDates":[]}');
   }
-
   function renderStats() {
     const s = getStats();
-    const weekStart = getMondayStr();
-    const thisWeek  = (s.weekDates || []).filter(d => d >= weekStart).length;
-    document.getElementById('statStreak').textContent = s.streak   || 0;
-    document.getElementById('statTotal').textContent  = s.total    || 0;
+    const thisWeek = (s.weekDates||[]).filter(d => d >= getMondayStr()).length;
+    document.getElementById('statStreak').textContent = s.streak || 0;
+    document.getElementById('statTotal').textContent  = s.total  || 0;
     document.getElementById('statWeek').textContent   = thisWeek;
   }
-
   function bumpStats() {
-    const s         = getStats();
-    const today     = todayStr();
-    const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0,10);
-
-    if (s.lastDate !== today) {
-      s.streak = s.lastDate === yesterday ? (s.streak || 0) + 1 : 1;
-    }
-    s.total    = (s.total || 0) + 1;
-    s.lastDate = today;
-
-    const weekStart  = getMondayStr();
-    const weekDates  = (s.weekDates || []).filter(d => d >= weekStart);
-    if (!weekDates.includes(today)) weekDates.push(today);
-    s.weekDates = weekDates;
-
-    localStorage.setItem(STATS_KEY, JSON.stringify(s));
-    renderStats();
+    const s = getStats(), today = todayStr();
+    const yesterday = new Date(Date.now()-864e5).toISOString().slice(0,10);
+    if (s.lastDate !== today) s.streak = s.lastDate === yesterday ? (s.streak||0)+1 : 1;
+    s.total = (s.total||0)+1; s.lastDate = today;
+    const wd = (s.weekDates||[]).filter(d => d >= getMondayStr());
+    if (!wd.includes(today)) wd.push(today);
+    s.weekDates = wd;
+    localStorage.setItem(STATS_KEY, JSON.stringify(s)); renderStats();
+  }
+  function todayStr() { return new Date().toISOString().slice(0,10); }
+  function getMondayStr() {
+    const d = new Date(), day = d.getDay();
+    return new Date(d.setDate(d.getDate()-day+(day===0?-6:1))).toISOString().slice(0,10);
   }
 
-  function todayStr()    { return new Date().toISOString().slice(0,10); }
-  function getMondayStr(){
-    const d   = new Date();
-    const day = d.getDay();
-    const off = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(off)).toISOString().slice(0,10);
+  // ── DRAFT ────────────────────────────────────────────────────────────────────
+  function saveDraft() { localStorage.setItem(DRAFT_KEY, JSON.stringify(answers)); showBadge('\u{1F4BE} Draft saved'); }
+  function loadDraft() {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
+    if (d) { answers = d; showBadge('\u21A9 Draft restored'); }
   }
+  function clearDraft() { localStorage.removeItem(DRAFT_KEY); showBadge(''); }
+  function showBadge(m) { document.getElementById('draftBadge').textContent = m; }
 
-  // ── DRAFT ──────────────────────────────────────────────────────────────────
-  let draftTimer;
-
-  function saveDraft() {
-    const draft = {};
-    FIELDS.forEach(f => draft[f] = document.getElementById(f).value);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    showBadge('💾 Draft saved');
+  // ── DOTS ─────────────────────────────────────────────────────────────────────
+  function buildDots() {
+    document.getElementById('stepDots').innerHTML =
+      FIELDS.map((f,i) => `<div class="step-dot ${i===0?'active':''}" title="${f.title}"></div>`).join('');
   }
-
-  function restoreDraft() {
-    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    if (!draft) return;
-    let restored = false;
-    FIELDS.forEach(f => {
-      if (draft[f]) { document.getElementById(f).value = draft[f]; restored = true; }
+  function updateDots() {
+    document.querySelectorAll('.step-dot').forEach((d,i) => {
+      d.className = 'step-dot' + (i<step?' done':i===step?' active':'');
     });
-    if (restored) { showBadge('↩ Draft restored'); updateProgress(); updateChar(); }
   }
 
-  function clearDraft() {
-    localStorage.removeItem(DRAFT_KEY);
-    showBadge('');
-  }
+  // ── WORD COUNT ───────────────────────────────────────────────────────────────
+  function countWords(str) { return str.trim().split(/\s+/).filter(w=>w.length>0).length; }
 
-  function showBadge(msg) {
-    document.getElementById('draftBadge').textContent = msg;
-  }
-
-  // ── PROGRESS ───────────────────────────────────────────────────────────────
-  function updateProgress() {
-    const filled = FIELDS.filter(f => document.getElementById(f).value.trim()).length;
-    const pct    = (filled / FIELDS.length) * 100;
-    document.getElementById('progFill').style.width = pct + '%';
-    document.getElementById('progText').textContent = `${filled} / ${FIELDS.length} fields`;
-  }
-
-  function updateChar() {
-    const n = document.getElementById('dump').value.length;
-    document.getElementById('charCount').textContent = n.toLocaleString('en-IN');
-  }
-
-  // ── EVENTS ─────────────────────────────────────────────────────────────────
-  function bindEvents() {
-    FIELDS.forEach(f => {
-      document.getElementById(f).addEventListener('input', () => {
-        updateProgress();
-        if (f === 'dump') updateChar();
-        clearTimeout(draftTimer);
-        draftTimer = setTimeout(saveDraft, 1400);
-      });
+  // ── RENDER STEP ──────────────────────────────────────────────────────────────
+  function renderStep(i, dir='right') {
+    const f = FIELDS[i], val = answers[f.id]||'';
+    document.getElementById('cardStage').innerHTML = `
+      <div class="card ${f.isDump?'dump':''} slide-in-${dir}">
+        <div class="card-header">
+          <span class="tag">${f.num}</span>
+          <span class="card-title">${f.title}</span>
+        </div>
+        <p class="card-question">${f.question}</p>
+        <textarea id="ta_${f.id}" placeholder="${f.isDump?'Let it all out\u2026':'Write here\u2026'}" rows="${f.isDump?9:4}">${val}</textarea>
+        <div class="wc-bar">
+          <span class="wc-range">min ${f.min} \u2013 max ${f.max} words</span>
+          <span class="wc-right">
+            <span class="wc-hint" id="wcHint"></span>
+            <span class="wc-count" id="wcCount">0 words</span>
+          </span>
+        </div>
+      </div>`;
+    const ta = document.getElementById('ta_'+f.id);
+    ta.focus();
+    refreshWC(countWords(val), f);
+    ta.addEventListener('input', () => {
+      const v = ta.value, w = countWords(v);
+      answers[f.id] = v; refreshWC(w, f);
+      clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 1400);
     });
+    updateDots(); updateBackBtn();
+  }
 
+  function refreshWC(wc, f) {
+    const cEl = document.getElementById('wcCount'), hEl = document.getElementById('wcHint');
+    const btn  = document.getElementById('btnNext');
+    const last = step === FIELDS.length-1;
+    let cls, hint;
+    if (wc < f.min)      { cls='under'; hint=`Need ${f.min-wc} more word${f.min-wc===1?'':\'s'}`; }
+    else if (wc > f.max) { cls='over';  hint=`${wc-f.max} word${wc-f.max===1?'':\'s'} over limit`; }
+    else                 { cls='valid'; hint='\u2713 Good to go'; }
+    cEl.textContent = wc+' words'; cEl.className = 'wc-count '+cls;
+    hEl.textContent = hint;         hEl.className = 'wc-hint '+cls;
+    const valid = cls==='valid';
+    btn.disabled = !valid;
+    if (!valid) { btn.textContent = hint; btn.className = 'btn-next'; }
+    else if (last) { btn.textContent = '\u2756 Submit Entry'; btn.className = 'btn-next submit'; }
+    else           { btn.textContent = 'Continue \u2192';     btn.className = 'btn-next'; }
+  }
+
+  function updateBackBtn() {
+    document.getElementById('btnBack').style.display = step>0?'block':'none';
+  }
+
+  // ── NAV ──────────────────────────────────────────────────────────────────────
+  function bindNav() {
+    document.getElementById('btnNext').addEventListener('click', goNext);
+    document.getElementById('btnBack').addEventListener('click', goBack);
     document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter')
-        document.getElementById('form').requestSubmit();
+      if ((e.ctrlKey||e.metaKey) && e.key==='ArrowRight') goNext();
+      if ((e.ctrlKey||e.metaKey) && e.key==='ArrowLeft')  goBack();
     });
-
-    document.getElementById('form').addEventListener('submit', handleSubmit);
+  }
+  function goNext() {
+    const f = FIELDS[step], ta = document.getElementById('ta_'+f.id);
+    if (!ta) return;
+    answers[f.id] = ta.value;
+    const wc = countWords(ta.value);
+    if (wc < f.min || wc > f.max) return;
+    if (step === FIELDS.length-1) { submitEntry(); return; }
+    step++; renderStep(step, 'right');
+  }
+  function goBack() {
+    if (step===0) return;
+    const ta = document.getElementById('ta_'+FIELDS[step].id);
+    if (ta) answers[FIELDS[step].id] = ta.value;
+    step--; renderStep(step, 'left');
   }
 
-  // ── SUBMIT ─────────────────────────────────────────────────────────────────
-  async function handleSubmit(e) {
-    e.preventDefault();
-
-    const values = {};
-    FIELDS.forEach(f => values[f] = document.getElementById(f).value.trim());
-    if (FIELDS.every(f => !values[f])) { toast('Write something first!', true); return; }
-
-    const btn = document.getElementById('submitBtn');
-    btn.disabled    = true;
-    btn.textContent = '⏳  Sending to Doc…';
-
+  // ── SUBMIT ───────────────────────────────────────────────────────────────────
+  async function submitEntry() {
+    const btn = document.getElementById('btnNext');
+    btn.disabled=true; btn.textContent='\u23F3 Sending\u2026';
     const payload = JSON.stringify({
       timestamp: new Date().toLocaleString('en-IN', {
-        weekday:'long', day:'numeric', month:'long',
-        year:'numeric', hour:'2-digit', minute:'2-digit'
-      }),
-      ...values
+        weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'
+      }), ...answers
     });
-
     try {
-      // NOTE: Content-Type 'text/plain' avoids CORS preflight — Apps Script handles it fine
-      await fetch(SCRIPT_URL, {
-        method:  'POST',
-        body:    payload,
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-      });
-
-      bumpStats();
-      clearDraft();
-      FIELDS.forEach(f => document.getElementById(f).value = '');
-      updateProgress();
-      updateChar();
-
-      btn.textContent = '✓  Entry Logged!';
-      toast('Saved to your Google Doc 📄');
-      setTimeout(() => { btn.disabled = false; btn.textContent = '✦ Log Today\'s Entry'; }, 2800);
-
-    } catch (err) {
-      btn.disabled    = false;
-      btn.textContent = '✦ Log Today\'s Entry';
-      toast('Could not reach your Doc — check the script URL.', true);
+      await fetch(SCRIPT_URL, { method:'POST', body:payload, headers:{'Content-Type':'text/plain;charset=utf-8'} });
+      bumpStats(); clearDraft(); answers={}; step=0;
+      renderStep(0,'right'); updateDots();
+      btn.textContent='\u2713 Logged!';
+      toast('Entry saved to your Google Doc \uD83D\uDCC4');
+      setTimeout(()=>{ btn.disabled=false; btn.textContent='Continue \u2192'; },2800);
+    } catch(err) {
+      btn.disabled=false; btn.textContent='\u2756 Submit Entry';
+      toast('Could not reach your Doc \u2014 check the script URL.', true);
     }
   }
 
-  // ── TOAST ──────────────────────────────────────────────────────────────────
-  function toast(msg, err = false) {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className   = 'toast' + (err ? ' err' : '');
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 3200);
+  // ── TOAST ────────────────────────────────────────────────────────────────────
+  function toast(msg, err=false) {
+    const el=document.getElementById('toast');
+    el.textContent=msg; el.className='toast'+(err?' err':'');
+    el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),3200);
   }
 </script>
 </body>
