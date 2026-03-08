@@ -236,7 +236,7 @@
   let step = 0, answers = {}, draftTimer;
 
   // ── BOOT ─────────────────────────────────────────────────────────────────────
-  setDate(); renderStats(); loadDraft(); buildDots(); renderStep(step, 'right'); bindNav();
+  setDate(); syncStats(); loadDraft(); buildDots(); renderStep(step, 'right'); bindNav();
 
   // ── DATE ─────────────────────────────────────────────────────────────────────
   function setDate() {
@@ -245,31 +245,29 @@
   }
 
   // ── STATS ────────────────────────────────────────────────────────────────────
-  function getStats() {
-    return JSON.parse(localStorage.getItem(STATS_KEY) || '{"total":0,"streak":0,"lastDate":null,"weekDates":[]}');
+  // ── STATS (Sheets-synced, localStorage as fallback) ─────────────────────────────
+const STATS_KEY = 'tlb_stats_cache';
+
+// Called on page load — fetches live stats from Google Sheet
+async function syncStats() {
+  try {
+    const res  = await fetch(SCRIPT_URL);   // simple GET, no preflight
+    const data = await res.json();
+    applyStats(data);
+    localStorage.setItem(STATS_KEY, JSON.stringify(data)); // cache for offline
+  } catch (err) {
+    // Offline or script unreachable — show cached stats
+    const cached = JSON.parse(localStorage.getItem(STATS_KEY) || 'null');
+    if (cached) applyStats(cached);
   }
-  function renderStats() {
-    const s = getStats();
-    const thisWeek = (s.weekDates||[]).filter(d => d >= getMondayStr()).length;
-    document.getElementById('statStreak').textContent = s.streak || 0;
-    document.getElementById('statTotal').textContent  = s.total  || 0;
-    document.getElementById('statWeek').textContent   = thisWeek;
-  }
-  function bumpStats() {
-    const s = getStats(), today = todayStr();
-    const yesterday = new Date(Date.now()-864e5).toISOString().slice(0,10);
-    if (s.lastDate !== today) s.streak = s.lastDate === yesterday ? (s.streak||0)+1 : 1;
-    s.total = (s.total||0)+1; s.lastDate = today;
-    const wd = (s.weekDates||[]).filter(d => d >= getMondayStr());
-    if (!wd.includes(today)) wd.push(today);
-    s.weekDates = wd;
-    localStorage.setItem(STATS_KEY, JSON.stringify(s)); renderStats();
-  }
-  function todayStr() { return new Date().toISOString().slice(0,10); }
-  function getMondayStr() {
-    const d = new Date(), day = d.getDay();
-    return new Date(d.setDate(d.getDate()-day+(day===0?-6:1))).toISOString().slice(0,10);
-  }
+}
+
+// Updates the three stat cards in the UI
+function applyStats(data) {
+  document.getElementById('statStreak').textContent = data.streak    || 0;
+  document.getElementById('statTotal').textContent  = data.total     || 0;
+  document.getElementById('statWeek').textContent   = data.weekCount || 0;
+}
 
   // ── DRAFT ────────────────────────────────────────────────────────────────────
   function saveDraft() { localStorage.setItem(DRAFT_KEY, JSON.stringify(answers)); showBadge('\u{1F4BE} Draft saved'); }
@@ -380,16 +378,28 @@
       }), ...answers
     });
     try {
-      await fetch(SCRIPT_URL, { method:'POST', body:payload, headers:{'Content-Type':'text/plain;charset=utf-8'} });
-      bumpStats(); clearDraft(); answers={}; step=0;
-      renderStep(0,'right'); updateDots();
-      btn.textContent='\u2713 Logged!';
-      toast('Entry saved to your Google Doc \uD83D\uDCC4');
-      setTimeout(()=>{ btn.disabled=false; btn.textContent='Continue \u2192'; },2800);
-    } catch(err) {
-      btn.disabled=false; btn.textContent='\u2756 Submit Entry';
-      toast('Could not reach your Doc \u2014 check the script URL.', true);
-    }
+  const res    = await fetch(SCRIPT_URL, {
+    method:  'POST',
+    body:    payload,
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+  });
+  const result = await res.json();
+
+  // Update stats from server response (no second network call needed)
+  if (result.status === 'ok') applyStats(result);
+
+  clearDraft();
+  answers = {}; step = 0;
+  renderStep(0, 'right'); updateDots();
+  btn.textContent = '\u2713 Logged!';
+  toast('Entry saved to your Google Doc \uD83D\uDCC4');
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Continue \u2192'; }, 2800);
+
+} catch (err) {
+  btn.disabled    = false;
+  btn.textContent = '\u2756 Submit Entry';
+  toast('Could not reach your Doc \u2014 check the script URL.', true);
+}
   }
 
   // ── TOAST ────────────────────────────────────────────────────────────────────
