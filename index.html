@@ -372,6 +372,7 @@ function applyStats(data) {
     const btn = document.getElementById('btnNext');
     btn.disabled=true; btn.textContent='\u23F3 Sending\u2026';
     const payload = JSON.stringify({
+      token: 'journal@2026',
       timestamp: new Date().toLocaleString('en-IN', {
         weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'
       }), ...answers
